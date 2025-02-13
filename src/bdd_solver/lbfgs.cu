@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "lbfgs_impl.h"
 #include "bdd_solver/bdd_cuda_parallel_mma.h"
 

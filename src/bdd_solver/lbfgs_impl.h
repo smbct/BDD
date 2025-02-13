@@ -1,5 +1,5 @@
 #pragma once
-
+#include "fix.h"
 #include "bdd_solver/lbfgs.h"
 
 namespace LPMP {

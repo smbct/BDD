@@ -1,7 +1,7 @@
+#include "fix.h"
 #include "bdd_solver/bdd_cuda_base.h"
 #include "time_measure_util.h"
 #include "cuda_utils.h"
-#include "fix.h"
 #include <thrust/sort.h>
 #include <thrust/for_each.h>
 #include <thrust/gather.h>

@@ -1,8 +1,8 @@
+#include "fix.h"
 #include "bdd_solver/incremental_mm_agreement_rounding_cuda.h"
 #include <iostream>
 #include <chrono>
 #include <iomanip>
-#include "fix.h"
 #include <thrust/device_vector.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/copy.h>

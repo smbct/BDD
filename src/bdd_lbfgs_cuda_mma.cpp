@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_lbfgs_cuda_mma.h"
 #ifdef WITH_CUDA
 #include "lbfgs.h"

@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_solver/bdd_multi_parallel_mma_base.h"
 #include "two_dimensional_variable_array.hxx"
 #include <limits>
