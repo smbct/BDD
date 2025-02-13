@@ -1,7 +1,10 @@
 #pragma once
 
+#include "fix.h"
+
 #include <cuda_runtime.h>
 #include <math_constants.h>
+
 #include <thrust/count.h>
 #include <thrust/copy.h>
 #include <thrust/device_vector.h>
@@ -141,33 +144,33 @@ inline void checkCudaError(cudaError_t status, std::string errorMsg)
 }
 
 template<typename T>
-inline thrust::device_vector<T> repeat_values(const thrust::device_vector<T>& values, const thrust::device_vector<int>& counts)
+inline mgxthrust::device_vector<T> repeat_values(const mgxthrust::device_vector<T>& values, const mgxthrust::device_vector<int>& counts)
 {
     MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
-    thrust::device_vector<int> counts_sum(counts.size() + 1);
+    mgxthrust::device_vector<int> counts_sum(counts.size() + 1);
     counts_sum[0] = 0;
-    thrust::inclusive_scan(counts.begin(), counts.end(), counts_sum.begin() + 1);
+    mgxthrust::inclusive_scan(counts.begin(), counts.end(), counts_sum.begin() + 1);
     
     int out_size = counts_sum.back();
-    thrust::device_vector<int> output_indices(out_size, 0);
+    mgxthrust::device_vector<int> output_indices(out_size, 0);
 
-    thrust::scatter(thrust::constant_iterator<int>(1), thrust::constant_iterator<int>(1) + values.size(), counts_sum.begin(), output_indices.begin());
+    mgxthrust::scatter(mgxthrust::constant_iterator<int>(1), mgxthrust::constant_iterator<int>(1) + values.size(), counts_sum.begin(), output_indices.begin());
 
-    thrust::inclusive_scan(output_indices.begin(), output_indices.end(), output_indices.begin());
-    thrust::transform(output_indices.begin(), output_indices.end(), thrust::make_constant_iterator(1), output_indices.begin(), thrust::minus<int>());
+    mgxthrust::inclusive_scan(output_indices.begin(), output_indices.end(), output_indices.begin());
+    mgxthrust::transform(output_indices.begin(), output_indices.end(), mgxthrust::make_constant_iterator(1), output_indices.begin(), mgxthrust::minus<int>());
 
-    thrust::device_vector<T> out_values(out_size);
-    thrust::gather(output_indices.begin(), output_indices.end(), values.begin(), out_values.begin());
+    mgxthrust::device_vector<T> out_values(out_size);
+    mgxthrust::gather(output_indices.begin(), output_indices.end(), values.begin(), out_values.begin());
 
     return out_values;
 }
 
 template<typename T>
-inline thrust::device_vector<T> concatenate(const thrust::device_vector<T>& a, const thrust::device_vector<T>& b)
+inline mgxthrust::device_vector<T> concatenate(const mgxthrust::device_vector<T>& a, const mgxthrust::device_vector<T>& b)
 {
-    thrust::device_vector<T> ab(a.size() + b.size());
-    thrust::copy(a.begin(), a.end(), ab.begin());
-    thrust::copy(b.begin(), b.end(), ab.begin() + a.size());
+    mgxthrust::device_vector<T> ab(a.size() + b.size());
+    mgxthrust::copy(a.begin(), a.end(), ab.begin());
+    mgxthrust::copy(b.begin(), b.end(), ab.begin() + a.size());
     return ab;
 }
 
@@ -180,61 +183,61 @@ struct add_noise_func
 
     __host__ __device__ void operator()(const unsigned int n)
     {
-        thrust::default_random_engine rng;
-        thrust::uniform_real_distribution<T> dist(-noise_mag, noise_mag);
+        mgxthrust::default_random_engine rng;
+        mgxthrust::uniform_real_distribution<T> dist(-noise_mag, noise_mag);
         rng.discard(seed + n);
         vec[n] += dist(rng);
     }
 };
 
 template<typename T>
-inline void add_noise(thrust::device_ptr<T> v, const size_t num, const T noise_magnitude, const unsigned int seed)
+inline void add_noise(mgxthrust::device_ptr<T> v, const size_t num, const T noise_magnitude, const unsigned int seed)
 {
-    add_noise_func<T> add_noise({seed, noise_magnitude, thrust::raw_pointer_cast(v)});
-    thrust::for_each(thrust::make_counting_iterator<unsigned int>(0), thrust::make_counting_iterator<unsigned int>(0) + num, add_noise);
+    add_noise_func<T> add_noise({seed, noise_magnitude, mgxthrust::raw_pointer_cast(v)});
+    mgxthrust::for_each(mgxthrust::make_counting_iterator<unsigned int>(0), mgxthrust::make_counting_iterator<unsigned int>(0) + num, add_noise);
 }
 
 template<typename T>
-inline void print_vector(const thrust::device_vector<T>& v, const char* name, const int num = 0)
+inline void print_vector(const mgxthrust::device_vector<T>& v, const char* name, const int num = 0)
 {
     std::cout<<name<<": ";
     if (num == 0)
-        thrust::copy(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));
+        mgxthrust::copy(v.begin(), v.end(), std::ostream_iterator<T>(std::cout, " "));
     else
     {
         int size = std::distance(v.begin(), v.end());
-        thrust::copy(v.begin(), v.begin() + std::min(size, num), std::ostream_iterator<T>(std::cout, " "));
+        mgxthrust::copy(v.begin(), v.begin() + std::min(size, num), std::ostream_iterator<T>(std::cout, " "));
     }
     std::cout<<"\n";
 }
 
 template<typename T>
-inline void print_vector(const thrust::device_ptr<T>& v, const char* name, const int num)
+inline void print_vector(const mgxthrust::device_ptr<T>& v, const char* name, const int num)
 {
     std::cout<<name<<": ";
-    thrust::copy(v, v + num, std::ostream_iterator<T>(std::cout, " "));
+    mgxthrust::copy(v, v + num, std::ostream_iterator<T>(std::cout, " "));
     std::cout<<"\n";
 }
 
 template<typename T>
-inline void check_finite(const thrust::device_ptr<T>& v, const size_t num)
+inline void check_finite(const mgxthrust::device_ptr<T>& v, const size_t num)
 {
-    auto result = thrust::minmax_element(v, v + num);
+    auto result = mgxthrust::minmax_element(v, v + num);
     assert(std::isfinite(*result.first));
     assert(std::isfinite(*result.second));
 }
 
 template<typename T>
-inline void print_min_max(const thrust::device_ptr<T>& v, const char* name, const size_t num)
+inline void print_min_max(const mgxthrust::device_ptr<T>& v, const char* name, const size_t num)
 {
-    auto result = thrust::minmax_element(v, v + num);
+    auto result = mgxthrust::minmax_element(v, v + num);
     std::cout<<name<<": min = "<<*result.first<<", max = "<<*result.second<<"\n";
 }
 
 template<typename T>
-inline void print_norm(const thrust::device_ptr<T>& v, const char* name, const size_t num)
+inline void print_norm(const mgxthrust::device_ptr<T>& v, const char* name, const size_t num)
 {
-    T result = std::sqrt(thrust::inner_product(v, v + num, v, (T) 0.0));
+    T result = std::sqrt(mgxthrust::inner_product(v, v + num, v, (T) 0.0));
     std::cout<<name<<": norm = "<<result<<"\n";
 }
 
@@ -242,9 +245,9 @@ struct tuple_min
 {
     template<typename REAL>
     __host__ __device__
-    thrust::tuple<REAL, REAL> operator()(const thrust::tuple<REAL, REAL>& t0, const thrust::tuple<REAL, REAL>& t1)
+    mgxthrust::tuple<REAL, REAL> operator()(const mgxthrust::tuple<REAL, REAL>& t0, const mgxthrust::tuple<REAL, REAL>& t1)
     {
-        return thrust::make_tuple(min(thrust::get<0>(t0), thrust::get<0>(t1)), min(thrust::get<1>(t0), thrust::get<1>(t1)));
+        return mgxthrust::make_tuple(min(mgxthrust::get<0>(t0), mgxthrust::get<0>(t1)), min(mgxthrust::get<1>(t0), mgxthrust::get<1>(t1)));
     }
 };
 
@@ -252,8 +255,8 @@ struct tuple_sum
 {
     template<typename T>
     __host__ __device__
-    thrust::tuple<T, T> operator()(const thrust::tuple<T, T>& t0, const thrust::tuple<T, T>& t1)
+    mgxthrust::tuple<T, T> operator()(const mgxthrust::tuple<T, T>& t0, const mgxthrust::tuple<T, T>& t1)
     {
-        return thrust::make_tuple(thrust::get<0>(t0) + thrust::get<0>(t1), thrust::get<1>(t0) + thrust::get<1>(t1));
+        return mgxthrust::make_tuple(mgxthrust::get<0>(t0) + mgxthrust::get<0>(t1), mgxthrust::get<1>(t0) + mgxthrust::get<1>(t1));
     }
 };

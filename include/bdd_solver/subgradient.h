@@ -4,6 +4,7 @@
 #include "bdd_logging.h"
 #include <limits>
 #ifdef WITH_CUDA
+#include "fix.h"
 #include <thrust/device_vector.h>
 #endif
 

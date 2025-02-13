@@ -2,6 +2,7 @@
 #include <iostream>
 #include <chrono>
 #include <iomanip>
+#include "fix.h"
 #include <thrust/device_vector.h>
 #include <thrust/iterator/zip_iterator.h>
 #include <thrust/copy.h>
@@ -28,10 +29,10 @@ namespace LPMP {
 
     template<typename REAL>
     struct mm_diff_direction_func {
-        __host__ __device__ char operator()(const thrust::tuple<REAL, REAL> t) const
+        __host__ __device__ char operator()(const mgxthrust::tuple<REAL, REAL> t) const
         {
-            REAL mm_0 = thrust::get<0>(t);
-            REAL mm_1 = thrust::get<1>(t);
+            REAL mm_0 = mgxthrust::get<0>(t);
+            REAL mm_1 = mgxthrust::get<1>(t);
             if(mm_0 + 1e-6 <= mm_1)
                 return -1;
             else if(mm_1 + 1e-6 <= mm_0)
@@ -47,11 +48,11 @@ namespace LPMP {
         const unsigned long nr_vars;
 
         __host__ __device__
-        void operator()(const thrust::tuple<char, char, int> t) const
+        void operator()(const mgxthrust::tuple<char, char, int> t) const
         {
-            const char mm_min = thrust::get<0>(t);
-            const char mm_max = thrust::get<1>(t);
-            const int var = thrust::get<2>(t);
+            const char mm_min = mgxthrust::get<0>(t);
+            const char mm_max = mgxthrust::get<1>(t);
+            const int var = mgxthrust::get<2>(t);
             if(var >= nr_vars)
                 return;
 
@@ -71,40 +72,40 @@ namespace LPMP {
     struct tuple_min_max
     {
         __host__ __device__
-        thrust::tuple<T, T> operator()(const thrust::tuple<T, T>& t0, const thrust::tuple<T, T>& t1)
+        mgxthrust::tuple<T, T> operator()(const mgxthrust::tuple<T, T>& t0, const mgxthrust::tuple<T, T>& t1)
         {
-            return thrust::make_tuple(min(thrust::get<0>(t0), thrust::get<0>(t1)), max(thrust::get<1>(t0), thrust::get<1>(t1)));
+            return mgxthrust::make_tuple(min(mgxthrust::get<0>(t0), mgxthrust::get<0>(t1)), max(mgxthrust::get<1>(t0), mgxthrust::get<1>(t1)));
         }
     };
 
     template<typename REAL>
-    thrust::device_vector<mm_type> compute_mm_types(const size_t nr_vars, const thrust::device_vector<REAL>& mm_0, const thrust::device_vector<REAL>& mm_1, const thrust::device_vector<int>& mm_vars)
+    mgxthrust::device_vector<mm_type> compute_mm_types(const size_t nr_vars, const mgxthrust::device_vector<REAL>& mm_0, const mgxthrust::device_vector<REAL>& mm_1, const mgxthrust::device_vector<int>& mm_vars)
     {
-        assert(thrust::is_sorted(mm_vars.begin(), mm_vars.end()));
-        thrust::device_vector<char> mm_diff_direction(mm_0.size());
+        assert(mgxthrust::is_sorted(mm_vars.begin(), mm_vars.end()));
+        mgxthrust::device_vector<char> mm_diff_direction(mm_0.size());
         {
-            auto first = thrust::make_zip_iterator(thrust::make_tuple(mm_0.begin(), mm_1.begin()));
-            auto last = thrust::make_zip_iterator(thrust::make_tuple(mm_0.end(), mm_1.end()));
-            thrust::transform(first, last, mm_diff_direction.begin(), mm_diff_direction_func<REAL>());
+            auto first = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_0.begin(), mm_1.begin()));
+            auto last = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_0.end(), mm_1.end()));
+            mgxthrust::transform(first, last, mm_diff_direction.begin(), mm_diff_direction_func<REAL>());
         }
 
-        thrust::device_vector<char> mm_diff_min(nr_vars + 1);
-        thrust::device_vector<char> mm_diff_max(nr_vars + 1);
+        mgxthrust::device_vector<char> mm_diff_min(nr_vars + 1);
+        mgxthrust::device_vector<char> mm_diff_max(nr_vars + 1);
         {
-            auto first_val = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_direction.begin(), mm_diff_direction.begin()));
-            auto first_out_val = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_min.begin(), mm_diff_max.begin()));
+            auto first_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_direction.begin(), mm_diff_direction.begin()));
+            auto first_out_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_min.begin(), mm_diff_max.begin()));
 
-            thrust::equal_to<int> binary_pred;
-            auto new_end = thrust::reduce_by_key(mm_vars.begin(), mm_vars.end(), first_val, thrust::make_discard_iterator(), first_out_val, binary_pred, tuple_min_max<char>());
-            const int out_size = thrust::distance(first_out_val, new_end.second);
+            mgxthrust::equal_to<int> binary_pred;
+            auto new_end = mgxthrust::reduce_by_key(mm_vars.begin(), mm_vars.end(), first_val, mgxthrust::make_discard_iterator(), first_out_val, binary_pred, tuple_min_max<char>());
+            const int out_size = mgxthrust::distance(first_out_val, new_end.second);
             assert(out_size == mm_diff_min.size());
         }
-        thrust::device_vector<mm_type> mm_types(nr_vars);
+        mgxthrust::device_vector<mm_type> mm_types(nr_vars);
         {
-            auto first_val = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_min.begin(), mm_diff_max.begin(), thrust::make_counting_iterator<int>(0)));
-            auto last_val = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_min.end(), mm_diff_max.end(),  thrust::make_counting_iterator<int>(0) + mm_diff_min.size()));
+            auto first_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_min.begin(), mm_diff_max.begin(), mgxthrust::make_counting_iterator<int>(0)));
+            auto last_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_min.end(), mm_diff_max.end(),  mgxthrust::make_counting_iterator<int>(0) + mm_diff_min.size()));
 
-            thrust::for_each(first_val, last_val, fill_mm_type_func({thrust::raw_pointer_cast(mm_types.data()), nr_vars}));
+            mgxthrust::for_each(first_val, last_val, fill_mm_type_func({mgxthrust::raw_pointer_cast(mm_types.data()), nr_vars}));
         }
 
         return mm_types;
@@ -114,27 +115,27 @@ namespace LPMP {
     struct tuple_sum
     {
         __host__ __device__
-        thrust::tuple<REAL, REAL> operator()(const thrust::tuple<REAL, REAL>& t0, const thrust::tuple<REAL, REAL>& t1)
+        mgxthrust::tuple<REAL, REAL> operator()(const mgxthrust::tuple<REAL, REAL>& t0, const mgxthrust::tuple<REAL, REAL>& t1)
         {
-            return thrust::make_tuple(thrust::get<0>(t0) + thrust::get<0>(t1), thrust::get<1>(t0) + thrust::get<1>(t1));
+            return mgxthrust::make_tuple(mgxthrust::get<0>(t0) + mgxthrust::get<0>(t1), mgxthrust::get<1>(t0) + mgxthrust::get<1>(t1));
         }
     };
 
     template<typename REAL>
-    std::tuple<thrust::device_vector<REAL>, thrust::device_vector<REAL>> compute_mm_sums(const size_t nr_vars, const thrust::device_vector<REAL>& mm_0, const thrust::device_vector<REAL>& mm_1, const thrust::device_vector<int>& mm_vars)
+    std::tuple<mgxthrust::device_vector<REAL>, mgxthrust::device_vector<REAL>> compute_mm_sums(const size_t nr_vars, const mgxthrust::device_vector<REAL>& mm_0, const mgxthrust::device_vector<REAL>& mm_1, const mgxthrust::device_vector<int>& mm_vars)
     {   
         assert(mm_0.size() == mm_vars.size());
         assert(mm_1.size() == mm_vars.size());
-        assert(thrust::is_sorted(mm_vars.begin(), mm_vars.end()));
-        thrust::device_vector<REAL> mm_sums_0(nr_vars + 1);
-        thrust::device_vector<REAL> mm_sums_1(nr_vars + 1);
+        assert(mgxthrust::is_sorted(mm_vars.begin(), mm_vars.end()));
+        mgxthrust::device_vector<REAL> mm_sums_0(nr_vars + 1);
+        mgxthrust::device_vector<REAL> mm_sums_1(nr_vars + 1);
 
-        auto first_val = thrust::make_zip_iterator(thrust::make_tuple(mm_0.begin(), mm_1.begin()));
-        auto first_out_val = thrust::make_zip_iterator(thrust::make_tuple(mm_sums_0.begin(), mm_sums_1.begin()));
+        auto first_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_0.begin(), mm_1.begin()));
+        auto first_out_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_sums_0.begin(), mm_sums_1.begin()));
 
-        thrust::equal_to<int> binary_pred;
-        auto new_end = thrust::reduce_by_key(mm_vars.begin(), mm_vars.end(), first_val, thrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum<REAL>());
-        const int out_size = thrust::distance(first_out_val, new_end.second);
+        mgxthrust::equal_to<int> binary_pred;
+        auto new_end = mgxthrust::reduce_by_key(mm_vars.begin(), mm_vars.end(), first_val, mgxthrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum<REAL>());
+        const int out_size = mgxthrust::distance(first_out_val, new_end.second);
         assert(out_size == mm_sums_0.size());
 
         // remove terminal nodes:
@@ -152,11 +153,11 @@ namespace LPMP {
         const int round_index;
 
         __host__ __device__
-        thrust::tuple<REAL, REAL> operator()(const thrust::tuple<mm_type,REAL,REAL,int> t) const
+        mgxthrust::tuple<REAL, REAL> operator()(const mgxthrust::tuple<mm_type,REAL,REAL,int> t) const
         {
-            const mm_type mmt = thrust::get<0>(t);
-            const REAL mm_0 = thrust::get<1>(t);
-            const REAL mm_1 = thrust::get<2>(t);
+            const mm_type mmt = mgxthrust::get<0>(t);
+            const REAL mm_0 = mgxthrust::get<1>(t);
+            const REAL mm_1 = mgxthrust::get<2>(t);
 
             if(mmt == mm_type::one)
             {
@@ -174,8 +175,8 @@ namespace LPMP {
             }
             else
             {
-                thrust::default_random_engine rng;
-                thrust::uniform_real_distribution<float> dist(-delta, delta);
+                mgxthrust::default_random_engine rng;
+                mgxthrust::uniform_real_distribution<float> dist(-delta, delta);
                 const int id = blockIdx.x * blockDim.x + threadIdx.x + round_index;
                 rng.discard(id); // TODO: have other source for randomness here!
                 const float r = dist(rng);
@@ -221,29 +222,29 @@ namespace LPMP {
     {
         const mm_type* mm_types;
         __host__ __device__
-        bool operator()(const thrust::tuple<REAL, int>& t) const
+        bool operator()(const mgxthrust::tuple<REAL, int>& t) const
         {
-            const int var = thrust::get<1>(t);
+            const int var = mgxthrust::get<1>(t);
             return mm_types[var] != mm_type::inconsistent; 
         }
     };
 
     template<typename REAL>
-    REAL compute_max_inconsistent_mm_diff(const thrust::device_vector<mm_type>& mm_types, const thrust::device_vector<REAL>& mm_sum_0, const thrust::device_vector<REAL>& mm_sum_1)
+    REAL compute_max_inconsistent_mm_diff(const mgxthrust::device_vector<mm_type>& mm_types, const mgxthrust::device_vector<REAL>& mm_sum_0, const mgxthrust::device_vector<REAL>& mm_sum_1)
     {
-        thrust::device_vector<REAL> mm_abs_diff(mm_sum_0.size());
-        thrust::transform(mm_sum_1.begin(), mm_sum_1.end(), mm_sum_0.begin(), mm_abs_diff.begin(), mm_abs_diff_func<REAL>());
+        mgxthrust::device_vector<REAL> mm_abs_diff(mm_sum_0.size());
+        mgxthrust::transform(mm_sum_1.begin(), mm_sum_1.end(), mm_sum_0.begin(), mm_abs_diff.begin(), mm_abs_diff_func<REAL>());
         
-        thrust::device_vector<int> inconsistent_primal_vars(mm_types.size());
-        thrust::sequence(inconsistent_primal_vars.begin(), inconsistent_primal_vars.end());
+        mgxthrust::device_vector<int> inconsistent_primal_vars(mm_types.size());
+        mgxthrust::sequence(inconsistent_primal_vars.begin(), inconsistent_primal_vars.end());
 
-        auto first = thrust::make_zip_iterator(thrust::make_tuple(mm_abs_diff.begin(), inconsistent_primal_vars.begin()));
-        auto last = thrust::make_zip_iterator(thrust::make_tuple(mm_abs_diff.end(), inconsistent_primal_vars.end()));
+        auto first = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_abs_diff.begin(), inconsistent_primal_vars.begin()));
+        auto last = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_abs_diff.end(), inconsistent_primal_vars.end()));
 
-        auto new_last = thrust::remove_if(first, last, is_consistent_func<REAL>({thrust::raw_pointer_cast(mm_types.data())}));
-        const int num_inconsistent = thrust::distance(first, new_last);
+        auto new_last = mgxthrust::remove_if(first, last, is_consistent_func<REAL>({mgxthrust::raw_pointer_cast(mm_types.data())}));
+        const int num_inconsistent = mgxthrust::distance(first, new_last);
         mm_abs_diff.resize(num_inconsistent);
-        return *thrust::max_element(mm_abs_diff.begin(), mm_abs_diff.end());
+        return *mgxthrust::max_element(mm_abs_diff.begin(), mm_abs_diff.end());
     }
 
 struct mm_type_to_sol {
@@ -264,17 +265,17 @@ struct mm_type_to_sol {
         {
             s.distribute_delta();
             const auto mms = s.min_marginals_cuda();
-            const thrust::device_vector<int>& primal_vars = std::get<0>(mms);
+            const mgxthrust::device_vector<int>& primal_vars = std::get<0>(mms);
             const auto& mms_0 = std::get<1>(mms);
             const auto& mms_1 = std::get<2>(mms);
             const auto mm_types = compute_mm_types(s.nr_variables(), mms_0, mms_1, primal_vars);
-            const size_t nr_one_mms = thrust::count(mm_types.begin(), mm_types.end(), mm_type::one);
-            const size_t nr_zero_mms = thrust::count(mm_types.begin(), mm_types.end(), mm_type::zero);
-            const size_t nr_equal_mms = thrust::count(mm_types.begin(), mm_types.end(), mm_type::equal);
-            const size_t nr_inconsistent_mms = thrust::count(mm_types.begin(), mm_types.end(), mm_type::inconsistent);
+            const size_t nr_one_mms = mgxthrust::count(mm_types.begin(), mm_types.end(), mm_type::one);
+            const size_t nr_zero_mms = mgxthrust::count(mm_types.begin(), mm_types.end(), mm_type::zero);
+            const size_t nr_equal_mms = mgxthrust::count(mm_types.begin(), mm_types.end(), mm_type::equal);
+            const size_t nr_inconsistent_mms = mgxthrust::count(mm_types.begin(), mm_types.end(), mm_type::inconsistent);
             if (nr_inconsistent_mms == 1)
             {
-                const size_t incon_index = thrust::distance(mm_types.begin(), thrust::find(mm_types.begin(), mm_types.end(), mm_type::inconsistent));
+                const size_t incon_index = mgxthrust::distance(mm_types.begin(), mgxthrust::find(mm_types.begin(), mm_types.end(), mm_type::inconsistent));
                 if (verbose) std::cout<<"Inconsistent index: "<<incon_index<<"\n";
             }
 
@@ -295,28 +296,28 @@ struct mm_type_to_sol {
             {
                 if (verbose) std::cout << "[incremental primal rounding cuda] reconstruct solution\n";
                 assert(mm_types.size() == s.nr_variables());
-                thrust::device_vector<char> device_sol(s.nr_variables());
-                thrust::transform(mm_types.begin(), mm_types.end(), device_sol.begin(), mm_type_to_sol{});
+                mgxthrust::device_vector<char> device_sol(s.nr_variables());
+                mgxthrust::transform(mm_types.begin(), mm_types.end(), device_sol.begin(), mm_type_to_sol{});
                 std::vector<char> sol(s.nr_variables());
-                thrust::copy(device_sol.begin(), device_sol.end(), sol.begin());
+                mgxthrust::copy(device_sol.begin(), device_sol.end(), sol.begin());
                 return sol;
             }
 
             using float_type = typename SOLVER::value_type;
-            thrust::device_vector<float_type> cost_delta_0(s.nr_variables());
-            thrust::device_vector<float_type> cost_delta_1(s.nr_variables());
+            mgxthrust::device_vector<float_type> cost_delta_0(s.nr_variables());
+            mgxthrust::device_vector<float_type> cost_delta_1(s.nr_variables());
 
             const auto mm_sums = compute_mm_sums(s.nr_variables(), mms_0, mms_1, primal_vars);
             const auto& mm_sums_0 = std::get<0>(mm_sums);
             const auto& mm_sums_1 = std::get<1>(mm_sums);
             const auto max_incon_mm_diff = compute_max_inconsistent_mm_diff(mm_types, mm_sums_0, mm_sums_1);
 
-            auto delta_it_begin = thrust::zip_iterator(thrust::make_tuple(cost_delta_0.begin(), cost_delta_1.begin()));
-            auto first = thrust::zip_iterator(thrust::make_tuple(mm_types.begin(), mm_sums_0.begin(), mm_sums_1.begin(), thrust::make_counting_iterator<int>(0)));
-            auto last = thrust::zip_iterator(thrust::make_tuple(mm_types.end(), mm_sums_0.end(), mm_sums_1.end(), thrust::make_counting_iterator<int>(0) + mm_types.size()));
+            auto delta_it_begin = mgxthrust::zip_iterator(mgxthrust::make_tuple(cost_delta_0.begin(), cost_delta_1.begin()));
+            auto first = mgxthrust::zip_iterator(mgxthrust::make_tuple(mm_types.begin(), mm_sums_0.begin(), mm_sums_1.begin(), mgxthrust::make_counting_iterator<int>(0)));
+            auto last = mgxthrust::zip_iterator(mgxthrust::make_tuple(mm_types.end(), mm_sums_0.end(), mm_sums_1.end(), mgxthrust::make_counting_iterator<int>(0) + mm_types.size()));
 
-            thrust::transform(first, last, delta_it_begin, mm_types_transform<typename SOLVER::value_type>{cur_delta, max_incon_mm_diff, 2.0, false, round_index});
-            // thrust::transform(first, last, delta_it_begin, mm_types_transform<typename SOLVER::value_type>{(float)cur_delta, (float)max_incon_mm_diff, 2.0, false});
+            mgxthrust::transform(first, last, delta_it_begin, mm_types_transform<typename SOLVER::value_type>{cur_delta, max_incon_mm_diff, 2.0, false, round_index});
+            // mgxthrust::transform(first, last, delta_it_begin, mm_types_transform<typename SOLVER::value_type>{(float)cur_delta, (float)max_incon_mm_diff, 2.0, false});
 
             s.update_costs(cost_delta_0, cost_delta_1);
             return {};

@@ -6,6 +6,7 @@
 #include "bdd_logging.h"
 #include <deque>
 #ifdef WITH_CUDA
+#include "fix.h"
 #include <thrust/for_each.h>
 #include <thrust/inner_product.h>
 #include <thrust/host_vector.h>
@@ -16,7 +17,7 @@
 namespace LPMP {
 
 #ifdef WITH_CUDA
-using namespace thrust::placeholders;
+using namespace mgxthrust::placeholders;
 #endif
 
 // LBFGS requires the following functions to be implemented in the SOLVER base class:
@@ -64,7 +65,7 @@ class lbfgs : public SOLVER
 
         void update_costs(const std::vector<REAL> &cost_lo, const std::vector<REAL> &cost_hi);
 #ifdef WITH_CUDA
-        void update_costs(const thrust::device_vector<REAL> &cost_0, const thrust::device_vector<REAL> &cost_1);
+        void update_costs(const mgxthrust::device_vector<REAL> &cost_0, const mgxthrust::device_vector<REAL> &cost_1);
 #endif
 
     private:

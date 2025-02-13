@@ -135,17 +135,17 @@ namespace LPMP {
         cpu_nr_bdds_per_var.reserve(cpu_base.nr_variables());
         for (size_t i = 0; i < cpu_base.nr_variables(); ++i)
             cpu_nr_bdds_per_var.push_back(cpu_base.nr_bdds(i));
-        total_nr_bdds_per_var_ = thrust::device_vector<size_t>(nr_variables(), 0);
-        thrust::copy(cpu_nr_bdds_per_var.begin(), cpu_nr_bdds_per_var.end(), total_nr_bdds_per_var_.begin());
-        thrust::transform(
+        total_nr_bdds_per_var_ = mgxthrust::device_vector<size_t>(nr_variables(), 0);
+        mgxthrust::copy(cpu_nr_bdds_per_var.begin(), cpu_nr_bdds_per_var.end(), total_nr_bdds_per_var_.begin());
+        mgxthrust::transform(
                 cuda_base.get_num_bdds_per_var().begin(), cuda_base.get_num_bdds_per_var().end(), 
                 total_nr_bdds_per_var_.begin(),
                 total_nr_bdds_per_var_.begin(),
-                thrust::plus<size_t>()
+                mgxthrust::plus<size_t>()
                 );
 
         // TODO: possibly initialize in parallel_mma, where it is used
-        gpu_delta_ = thrust::device_vector<REAL>(2 * cuda_base.nr_variables(), 0.0);
+        gpu_delta_ = mgxthrust::device_vector<REAL>(2 * cuda_base.nr_variables(), 0.0);
 
         // TODO: same
         cpu_delta_ = std::vector<std::array<REAL, 2>>(cpu_base.nr_variables(), {0.0, 0.0});
@@ -257,9 +257,9 @@ namespace LPMP {
     template <typename REAL>
     struct copy_delta_to_cpu_functor
     {
-        __device__ __host__ std::array<REAL,2> operator()(thrust::tuple<REAL,REAL> x)
+        __device__ __host__ std::array<REAL,2> operator()(mgxthrust::tuple<REAL,REAL> x)
             {
-                return {thrust::get<0>(x), thrust::get<1>(x)};
+                return {mgxthrust::get<0>(x), mgxthrust::get<1>(x)};
             }
     };
 
@@ -267,58 +267,58 @@ namespace LPMP {
     template<typename REAL>
         void bdd_multi_parallel_mma_base<REAL>::accumulate_delta_from_cpu(
                 const std::vector<std::array<REAL,2>>& cpu_delta,
-                thrust::device_vector<REAL>& accumulated)
+                mgxthrust::device_vector<REAL>& accumulated)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
             assert(cpu_delta.size() == cpu_base.nr_variables());
             assert(accumulated.size() == 2*nr_variables());
 
-            thrust::fill(accumulated.begin() + 2*cpu_base.nr_variables(), accumulated.end(), 0.0);
-            thrust::copy((REAL*)&cpu_delta[0], (REAL*)&cpu_delta[0] + 2*cpu_base.nr_variables(), accumulated.begin());
+            mgxthrust::fill(accumulated.begin() + 2*cpu_base.nr_variables(), accumulated.end(), 0.0);
+            mgxthrust::copy((REAL*)&cpu_delta[0], (REAL*)&cpu_delta[0] + 2*cpu_base.nr_variables(), accumulated.begin());
         }
 
     template<typename REAL>
-        void bdd_multi_parallel_mma_base<REAL>::accumulate_delta_from_gpu(const thrust::device_vector<REAL>& gpu_delta, thrust::device_vector<REAL>& accumulated)
+        void bdd_multi_parallel_mma_base<REAL>::accumulate_delta_from_gpu(const mgxthrust::device_vector<REAL>& gpu_delta, mgxthrust::device_vector<REAL>& accumulated)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
             assert(gpu_delta.size() == 2*cuda_base.nr_variables());
             assert(accumulated.size() == 2*nr_variables());
 
-            thrust::transform(
+            mgxthrust::transform(
                     accumulated.begin(), accumulated.begin() + 2*cuda_base.nr_variables(),
                     gpu_delta.begin(), 
                     accumulated.begin(), 
-                    thrust::plus<REAL>()
+                    mgxthrust::plus<REAL>()
                     );
         }
 
     template<typename REAL>
-        void bdd_multi_parallel_mma_base<REAL>::split_delta_to_gpu(const thrust::device_vector<REAL>& total_delta, thrust::device_vector<REAL>& gpu_delta)
+        void bdd_multi_parallel_mma_base<REAL>::split_delta_to_gpu(const mgxthrust::device_vector<REAL>& total_delta, mgxthrust::device_vector<REAL>& gpu_delta)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
             assert(total_delta.size() == 2*nr_variables());
             assert(gpu_delta.size() == 2*cuda_base.nr_variables());
 
-            thrust::copy(total_delta.begin(), total_delta.begin() + 2*cuda_base.nr_variables(), gpu_delta.begin());
+            mgxthrust::copy(total_delta.begin(), total_delta.begin() + 2*cuda_base.nr_variables(), gpu_delta.begin());
             // TODO: really needed?
             // set those elements to zero where the cuda solver has no BDDs?
         }
 
     template<typename REAL>
         void bdd_multi_parallel_mma_base<REAL>::split_delta_to_cpu(
-                const thrust::device_vector<REAL>& total_delta,
+                const mgxthrust::device_vector<REAL>& total_delta,
                 std::vector<std::array<REAL, 2>>& cpu_delta)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
             assert(total_delta.size() == 2*nr_variables());
             assert(cpu_delta.size() == cpu_base.nr_variables());
 
-            thrust::copy(total_delta.begin(), total_delta.begin() + 2*cpu_base.nr_variables(), (REAL*)&cpu_delta[0]);
+            mgxthrust::copy(total_delta.begin(), total_delta.begin() + 2*cpu_base.nr_variables(), (REAL*)&cpu_delta[0]);
             // TODO: set components to zero without BDDs?
         }
 
     template <typename REAL>
-    void bdd_multi_parallel_mma_base<REAL>::forward_mm(const REAL omega, thrust::device_vector<REAL>& delta)
+    void bdd_multi_parallel_mma_base<REAL>::forward_mm(const REAL omega, mgxthrust::device_vector<REAL>& delta)
     {
         assert(delta.size() == 2*nr_variables());
         {
@@ -336,7 +336,7 @@ namespace LPMP {
     }
 
     template <typename REAL>
-    void bdd_multi_parallel_mma_base<REAL>::backward_mm(const REAL omega, thrust::device_vector<REAL>& delta)
+    void bdd_multi_parallel_mma_base<REAL>::backward_mm(const REAL omega, mgxthrust::device_vector<REAL>& delta)
     {
         assert(delta.size() == 2*nr_variables());
         {
@@ -357,7 +357,7 @@ namespace LPMP {
     void bdd_multi_parallel_mma_base<REAL>::parallel_mma()
     {
         if(total_delta_.size() == 0)
-            total_delta_ = thrust::device_vector<REAL>(2*nr_variables(), 0.0);
+            total_delta_ = mgxthrust::device_vector<REAL>(2*nr_variables(), 0.0);
         else
             assert(total_delta_.size() == 2*nr_variables());
 
@@ -420,14 +420,14 @@ namespace LPMP {
     };
 
     template <typename REAL>
-    void bdd_multi_parallel_mma_base<REAL>::normalize_delta(thrust::device_vector<REAL>& delta) const
+    void bdd_multi_parallel_mma_base<REAL>::normalize_delta(mgxthrust::device_vector<REAL>& delta) const
     {
         assert(delta.size() == 2*nr_variables());
         normalize_delta_func<REAL> func {
-            thrust::raw_pointer_cast(delta.data()), 
-            thrust::raw_pointer_cast(total_nr_bdds_per_var_.data())
+            mgxthrust::raw_pointer_cast(delta.data()), 
+            mgxthrust::raw_pointer_cast(total_nr_bdds_per_var_.data())
         };
-        thrust::for_each_n(thrust::make_counting_iterator<size_t>(0), nr_variables(), func);
+        mgxthrust::for_each_n(mgxthrust::make_counting_iterator<size_t>(0), nr_variables(), func);
     }
 
     template <typename REAL>

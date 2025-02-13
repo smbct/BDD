@@ -72,34 +72,34 @@ std::vector<float> get_constraint_matrix_coeffs(const LPMP::ILP_input& ilp, cons
     std::vector<int> cumm_num_vars_per_constraint(solver.nr_bdds() + 1);
     std::vector<size_t> indices(num_elements);
     { // Create COO representation for faster indexing later.
-        thrust::device_vector<int> dev_primal_index = solver.get_primal_variable_index();
-        const thrust::device_vector<int> dev_bdd_index = solver.get_bdd_index();
-        thrust::device_vector<unsigned long> dev_indices(num_elements);
-        thrust::sequence(dev_indices.begin(), dev_indices.end());
+        mgxthrust::device_vector<int> dev_primal_index = solver.get_primal_variable_index();
+        const mgxthrust::device_vector<int> dev_bdd_index = solver.get_bdd_index();
+        mgxthrust::device_vector<unsigned long> dev_indices(num_elements);
+        mgxthrust::sequence(dev_indices.begin(), dev_indices.end());
 
-        thrust::device_vector<size_t> dev_bdd_to_constraint_map(bdd_to_constraint_map.begin(), bdd_to_constraint_map.end());
-        thrust::device_vector<int> dev_con_index(dev_bdd_index.size());
+        mgxthrust::device_vector<size_t> dev_bdd_to_constraint_map(bdd_to_constraint_map.begin(), bdd_to_constraint_map.end());
+        mgxthrust::device_vector<int> dev_con_index(dev_bdd_index.size());
 
         // Map bdd_index to constraint index:
-        thrust::gather(dev_bdd_index.begin(), dev_bdd_index.end(), dev_bdd_to_constraint_map.begin(), dev_con_index.begin());
+        mgxthrust::gather(dev_bdd_index.begin(), dev_bdd_index.end(), dev_bdd_to_constraint_map.begin(), dev_con_index.begin());
 
-        auto first_key = thrust::make_zip_iterator(thrust::make_tuple(dev_con_index.begin(), dev_primal_index.begin()));
-        auto last_key = thrust::make_zip_iterator(thrust::make_tuple(dev_con_index.end(), dev_primal_index.end()));
-        thrust::sort_by_key(thrust::device, first_key, last_key, dev_indices.begin());
+        auto first_key = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(dev_con_index.begin(), dev_primal_index.begin()));
+        auto last_key = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(dev_con_index.end(), dev_primal_index.end()));
+        mgxthrust::sort_by_key(mgxthrust::device, first_key, last_key, dev_indices.begin());
 
-        thrust::device_vector<int> dev_cumm_num_vars_per_constraint(num_elements);
-        auto new_last = thrust::reduce_by_key(dev_con_index.begin(), dev_con_index.end(), thrust::make_constant_iterator<int>(1), 
-                                thrust::make_discard_iterator(), dev_cumm_num_vars_per_constraint.begin());
+        mgxthrust::device_vector<int> dev_cumm_num_vars_per_constraint(num_elements);
+        auto new_last = mgxthrust::reduce_by_key(dev_con_index.begin(), dev_con_index.end(), mgxthrust::make_constant_iterator<int>(1), 
+                                mgxthrust::make_discard_iterator(), dev_cumm_num_vars_per_constraint.begin());
         const auto nr_con = std::distance(dev_cumm_num_vars_per_constraint.begin(), new_last.second);
         if (nr_con != solver.nr_bdds())
             throw std::runtime_error("con_indices reduced size mismatch.");
         dev_cumm_num_vars_per_constraint.resize(nr_con);
-        thrust::inclusive_scan(dev_cumm_num_vars_per_constraint.begin(), dev_cumm_num_vars_per_constraint.end(), 
+        mgxthrust::inclusive_scan(dev_cumm_num_vars_per_constraint.begin(), dev_cumm_num_vars_per_constraint.end(), 
                                 dev_cumm_num_vars_per_constraint.begin());
-        thrust::copy(dev_con_index.begin(), dev_con_index.end(), con_indices_sorted.begin());
-        thrust::copy(dev_primal_index.begin(), dev_primal_index.end(), var_indices_sorted.begin());
-        thrust::copy(dev_indices.begin(), dev_indices.end(), indices.begin());
-        thrust::copy(dev_cumm_num_vars_per_constraint.begin(), dev_cumm_num_vars_per_constraint.end(), 
+        mgxthrust::copy(dev_con_index.begin(), dev_con_index.end(), con_indices_sorted.begin());
+        mgxthrust::copy(dev_primal_index.begin(), dev_primal_index.end(), var_indices_sorted.begin());
+        mgxthrust::copy(dev_indices.begin(), dev_indices.end(), indices.begin());
+        mgxthrust::copy(dev_cumm_num_vars_per_constraint.begin(), dev_cumm_num_vars_per_constraint.end(), 
                     cumm_num_vars_per_constraint.begin() + 1);
         cumm_num_vars_per_constraint[0] = 0;
     }
@@ -159,28 +159,28 @@ LPMP::bdd_cuda_learned_mma<REAL>* initialize_from_ilp(const LPMP::ILP_input& ilp
 template<typename REAL>
 void lower_bound_per_bdd(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long lb_out_ptr)
 {
-    thrust::device_ptr<REAL> lb_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_out_ptr));
+    mgxthrust::device_ptr<REAL> lb_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_out_ptr));
     solver.lower_bound_per_bdd(lb_out_ptr_thrust);
 }
 
 template<typename REAL>
 void solution_per_bdd(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long sol_out_ptr)
 {
-    thrust::device_ptr<REAL> sol_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_out_ptr));
+    mgxthrust::device_ptr<REAL> sol_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_out_ptr));
     solver.bdds_solution_cuda(sol_out_ptr_thrust);
 }
 
 template<typename REAL>
 void smooth_solution_per_bdd(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long sol_out_ptr)
 {
-    thrust::device_ptr<REAL> sol_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_out_ptr));
+    mgxthrust::device_ptr<REAL> sol_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_out_ptr));
     solver.smooth_solution_cuda(sol_out_ptr_thrust);
 }
 
 template<typename REAL>
 void terminal_layer_indices(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long indices_out_ptr)
 {
-    thrust::device_ptr<int> indices_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<int*>(indices_out_ptr));
+    mgxthrust::device_ptr<int> indices_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<int*>(indices_out_ptr));
     solver.terminal_layer_indices(indices_out_ptr_thrust);
 }
 
@@ -188,104 +188,104 @@ template<typename REAL>
 void cost_from_root(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     REAL* ptr = reinterpret_cast<REAL*>(out_ptr); 
-    const thrust::device_vector<REAL> managed = solver.compute_get_cost_from_root();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<REAL> managed = solver.compute_get_cost_from_root();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void cost_from_terminal(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     REAL* ptr = reinterpret_cast<REAL*>(out_ptr); 
-    const thrust::device_vector<REAL> managed = solver.compute_get_cost_from_terminal();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<REAL> managed = solver.compute_get_cost_from_terminal();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void lo_bdd_node_index(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_lo_bdd_node_index();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_lo_bdd_node_index();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void hi_bdd_node_index(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_hi_bdd_node_index();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_hi_bdd_node_index();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void bdd_node_to_layer_map(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_bdd_node_to_layer_map();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_bdd_node_to_layer_map();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void root_indices(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_root_indices();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_root_indices();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void bot_sink_indices(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_bot_sink_indices();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_bot_sink_indices();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void top_sink_indices(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(out_ptr); 
-    const thrust::device_vector<int> managed = solver.get_top_sink_indices();
-    thrust::copy(managed.begin(), managed.end(), ptr);
+    const mgxthrust::device_vector<int> managed = solver.get_top_sink_indices();
+    mgxthrust::copy(managed.begin(), managed.end(), ptr);
 }
 
 template<typename REAL>
 void primal_variable_index(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long primal_variable_index_out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(primal_variable_index_out_ptr); 
-    const thrust::device_vector<int> primal_index_managed = solver.get_primal_variable_index();
-    thrust::transform(primal_index_managed.begin(), primal_index_managed.end(), ptr, set_primal_indices({solver.nr_variables()}));
+    const mgxthrust::device_vector<int> primal_index_managed = solver.get_primal_variable_index();
+    mgxthrust::transform(primal_index_managed.begin(), primal_index_managed.end(), ptr, set_primal_indices({solver.nr_variables()}));
 }
 
 template<typename REAL>
 void bdd_index(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long bdd_index_out_ptr)
 {
     int* ptr = reinterpret_cast<int*>(bdd_index_out_ptr); 
-    const thrust::device_vector<int> bdd_index_managed = solver.get_bdd_index();
-    thrust::copy(bdd_index_managed.begin(), bdd_index_managed.end(), ptr);
+    const mgxthrust::device_vector<int> bdd_index_managed = solver.get_bdd_index();
+    mgxthrust::copy(bdd_index_managed.begin(), bdd_index_managed.end(), ptr);
 }
 
 template<typename REAL>
 void get_primal_objective_vector(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long primal_obj_out_ptr)
 {
-    thrust::device_ptr<REAL> primal_obj_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(primal_obj_out_ptr));
+    mgxthrust::device_ptr<REAL> primal_obj_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(primal_obj_out_ptr));
     solver.compute_primal_objective_vec(primal_obj_out_ptr_thrust);
 }
 
 template<typename REAL>
 void get_solver_costs(const LPMP::bdd_cuda_learned_mma<REAL>& solver, const long lo_cost_out_ptr, const long hi_cost_out_ptr, const long deferred_mm_out_ptr)
 {
-    thrust::device_ptr<REAL> lo_cost_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(lo_cost_out_ptr));
-    thrust::device_ptr<REAL> hi_cost_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(hi_cost_out_ptr));
-    thrust::device_ptr<REAL> deferred_mm_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(deferred_mm_out_ptr));
+    mgxthrust::device_ptr<REAL> lo_cost_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(lo_cost_out_ptr));
+    mgxthrust::device_ptr<REAL> hi_cost_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(hi_cost_out_ptr));
+    mgxthrust::device_ptr<REAL> deferred_mm_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(deferred_mm_out_ptr));
     solver.get_solver_costs(lo_cost_out_ptr_thrust, hi_cost_out_ptr_thrust, deferred_mm_out_ptr_thrust);
 }
 
 template<typename REAL>
 void set_solver_costs(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long lo_cost_ptr, const long hi_cost_ptr, const long def_mm_ptr)
 {
-    thrust::device_ptr<REAL> lo_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(lo_cost_ptr));
-    thrust::device_ptr<REAL> hi_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(hi_cost_ptr));
-    thrust::device_ptr<REAL> def_mm_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(def_mm_ptr));
+    mgxthrust::device_ptr<REAL> lo_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(lo_cost_ptr));
+    mgxthrust::device_ptr<REAL> hi_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(hi_cost_ptr));
+    mgxthrust::device_ptr<REAL> def_mm_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(def_mm_ptr));
     solver.set_solver_costs(lo_cost_ptr_thrust, hi_cost_ptr_thrust, def_mm_ptr_thrust);
 }
 
@@ -302,18 +302,18 @@ int iterations(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long dist_weights
                 const bool omega_vec_valid, const int compute_history_for_itr, const float beta,
                 const long sol_avg_ptr, const long lb_first_order_avg_ptr, const long lb_second_order_avg_ptr) 
 {
-    thrust::device_ptr<REAL> distw_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(dist_weights_ptr));
-    thrust::device_ptr<REAL> omega_vec_thrust, sol_avg_ptr_thrust, lb_first_ptr_thrust, lb_second_ptr_thrust;
+    mgxthrust::device_ptr<REAL> distw_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(dist_weights_ptr));
+    mgxthrust::device_ptr<REAL> omega_vec_thrust, sol_avg_ptr_thrust, lb_first_ptr_thrust, lb_second_ptr_thrust;
     if (compute_history_for_itr)
     {
-        sol_avg_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_avg_ptr)); 
-        lb_first_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_first_order_avg_ptr)); 
-        lb_second_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_second_order_avg_ptr)); 
+        sol_avg_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(sol_avg_ptr)); 
+        lb_first_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_first_order_avg_ptr)); 
+        lb_second_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(lb_second_order_avg_ptr)); 
     }
     
     if (omega_vec_valid)
     {
-        omega_vec_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(omega_vec_ptr));
+        omega_vec_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(omega_vec_ptr));
         return solver.iterations(distw_ptr_thrust, num_itr, 1.0, improvement_slope, 
                                 sol_avg_ptr_thrust, lb_first_ptr_thrust, lb_second_ptr_thrust,
                                 compute_history_for_itr, beta, omega_vec_thrust);
@@ -331,15 +331,15 @@ void grad_iterations(LPMP::bdd_cuda_learned_mma<REAL>& solver,
                     const float omega_scalar, const int track_grad_after_itr, const int track_grad_for_num_itr,
                     const long omega_vec_ptr, const bool omega_vec_valid, const int num_caches) 
 {
-    thrust::device_ptr<const REAL> dist_weights_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(dist_weights_ptr));
-    thrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
-    thrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
-    thrust::device_ptr<REAL> grad_mm_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_mm_ptr));
-    thrust::device_ptr<REAL> grad_dist_weights_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_dist_weights_out_ptr));
-    thrust::device_ptr<REAL> grad_omega_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_omega_out_ptr));
+    mgxthrust::device_ptr<const REAL> dist_weights_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(dist_weights_ptr));
+    mgxthrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_mm_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_mm_ptr));
+    mgxthrust::device_ptr<REAL> grad_dist_weights_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_dist_weights_out_ptr));
+    mgxthrust::device_ptr<REAL> grad_omega_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_omega_out_ptr));
     if (omega_vec_valid)
     {
-        thrust::device_ptr<REAL> omega_vec_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(omega_vec_ptr));
+        mgxthrust::device_ptr<REAL> omega_vec_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(omega_vec_ptr));
         solver.grad_iterations(dist_weights_ptr_thrust, grad_lo_cost_ptr_thrust, grad_hi_cost_ptr_thrust,
                         grad_mm_ptr_thrust,grad_dist_weights_out_ptr_thrust, grad_omega_out_ptr_thrust,
                         1.0, track_grad_after_itr, track_grad_for_num_itr, num_caches, omega_vec_thrust);
@@ -360,50 +360,50 @@ template<typename REAL>
 void grad_distribute_delta(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long grad_lo_cost_ptr,
                         const long grad_hi_cost_ptr, const long grad_def_mm_out_ptr)
 {
-    thrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
-    thrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
-    thrust::device_ptr<REAL> grad_def_mm_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_def_mm_out_ptr));
+    mgxthrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_def_mm_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_def_mm_out_ptr));
     solver.grad_distribute_delta(grad_lo_cost_ptr_thrust, grad_hi_cost_ptr_thrust, grad_def_mm_out_ptr_thrust);
 }
 
 template<typename REAL>
 void grad_lower_bound_per_bdd(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long grad_lb_per_bdd, const long grad_lo_cost_ptr, const long grad_hi_cost_ptr, const bool smooth_lb)
 {
-    thrust::device_ptr<REAL> grad_lb_per_bdd_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lb_per_bdd));
-    thrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
-    thrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_lb_per_bdd_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lb_per_bdd));
+    mgxthrust::device_ptr<REAL> grad_lo_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_hi_cost_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
     solver.grad_lower_bound_per_bdd(grad_lb_per_bdd_thrust, grad_lo_cost_ptr_thrust, grad_hi_cost_ptr_thrust, smooth_lb);
 }
 
 template<typename REAL>
 void all_min_marginal_differences(LPMP::bdd_cuda_learned_mma<REAL>& solver,const long mm_diff_out_ptr)
 {
-    thrust::device_ptr<REAL> mm_diff_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(mm_diff_out_ptr));
+    mgxthrust::device_ptr<REAL> mm_diff_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(mm_diff_out_ptr));
     const auto mms = solver.min_marginals_cuda(false);
     const auto& mms_0 = std::get<1>(mms);
     const auto& mms_1 = std::get<2>(mms);
-    thrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), mm_diff_ptr_thrust, thrust::minus<double>());
+    mgxthrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), mm_diff_ptr_thrust, mgxthrust::minus<double>());
 }
 
 template<typename REAL>
 void sum_marginals(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long sum_lo_out_ptr, const long sum_hi_out_ptr, const bool get_logits)
 {
-    thrust::device_ptr<REAL> sum_lo_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(sum_lo_out_ptr));
-    thrust::device_ptr<REAL> sum_hi_out_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(sum_hi_out_ptr));
+    mgxthrust::device_ptr<REAL> sum_lo_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(sum_lo_out_ptr));
+    mgxthrust::device_ptr<REAL> sum_hi_out_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(sum_hi_out_ptr));
     const auto sum_ms = solver.sum_marginals_cuda(false, get_logits);
     const auto& sum_m_0 = std::get<1>(sum_ms);
     const auto& sum_m_1 = std::get<2>(sum_ms);
-    thrust::copy(sum_m_0.begin(), sum_m_0.end(), sum_lo_out_ptr_thrust);
-    thrust::copy(sum_m_1.begin(), sum_m_1.end(), sum_hi_out_ptr_thrust);
+    mgxthrust::copy(sum_m_0.begin(), sum_m_0.end(), sum_lo_out_ptr_thrust);
+    mgxthrust::copy(sum_m_1.begin(), sum_m_1.end(), sum_hi_out_ptr_thrust);
 }
 
 template<typename REAL>
 void grad_all_min_marginal_differences(LPMP::bdd_cuda_learned_mma<REAL>& solver, const long grad_mm_diff, 
                                     const long grad_lo_out, const long grad_hi_out)
 {
-    thrust::device_ptr<REAL> grad_mm_diff_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_mm_diff));
-    thrust::device_ptr<REAL> grad_lo_out_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_out));
-    thrust::device_ptr<REAL> grad_hi_out_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_out));
+    mgxthrust::device_ptr<REAL> grad_mm_diff_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_mm_diff));
+    mgxthrust::device_ptr<REAL> grad_lo_out_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_out));
+    mgxthrust::device_ptr<REAL> grad_hi_out_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_out));
     solver.grad_mm_diff_all_hops(grad_mm_diff_thrust, grad_lo_out_thrust, grad_hi_out_thrust);
 }
 
@@ -412,10 +412,10 @@ void grad_cost_perturbation(LPMP::bdd_cuda_learned_mma<REAL>& solver,
             const long grad_lo_cost_ptr, const long grad_hi_cost_ptr,
             const long grad_lo_pert_out, const long grad_hi_pert_out)
 {
-    thrust::device_ptr<REAL> grad_lo_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
-    thrust::device_ptr<REAL> grad_hi_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
-    thrust::device_ptr<REAL> grad_lo_pert_out_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_pert_out));
-    thrust::device_ptr<REAL> grad_hi_pert_out_thrust = thrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_pert_out));
+    mgxthrust::device_ptr<REAL> grad_lo_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_hi_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_cost_ptr));
+    mgxthrust::device_ptr<REAL> grad_lo_pert_out_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_lo_pert_out));
+    mgxthrust::device_ptr<REAL> grad_hi_pert_out_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<REAL*>(grad_hi_pert_out));
     solver.grad_cost_perturbation(grad_lo_thrust, grad_hi_thrust, grad_lo_pert_out_thrust, grad_hi_pert_out_thrust);
 }
 
@@ -672,8 +672,8 @@ PYBIND11_MODULE(bdd_cuda_learned_mma_py, m) {
 
         .def("perturb_costs", [](bdd_type_default& solver, const long lo_pert_ptr, const long hi_pert_ptr)
         {
-            thrust::device_ptr<float> lo_pert_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<float*>(lo_pert_ptr));
-            thrust::device_ptr<float> hi_pert_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<float*>(hi_pert_ptr));
+            mgxthrust::device_ptr<float> lo_pert_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<float*>(lo_pert_ptr));
+            mgxthrust::device_ptr<float> hi_pert_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<float*>(hi_pert_ptr));
             solver.update_costs<float>(lo_pert_ptr_thrust, solver.nr_variables(), hi_pert_ptr_thrust, solver.nr_variables());
         }, "Perturb primal costs by memory pointed by lo_pert_ptr, hi_pert_ptr. Where both inputs should point to a memory of size nr_variables().")
 
@@ -918,8 +918,8 @@ PYBIND11_MODULE(bdd_cuda_learned_mma_py, m) {
 
         .def("perturb_costs", [](bdd_type_double& solver, const long lo_pert_ptr, const long hi_pert_ptr)
         {
-            thrust::device_ptr<double> lo_pert_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<double*>(lo_pert_ptr));
-            thrust::device_ptr<double> hi_pert_ptr_thrust = thrust::device_pointer_cast(reinterpret_cast<double*>(hi_pert_ptr));
+            mgxthrust::device_ptr<double> lo_pert_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<double*>(lo_pert_ptr));
+            mgxthrust::device_ptr<double> hi_pert_ptr_thrust = mgxthrust::device_pointer_cast(reinterpret_cast<double*>(hi_pert_ptr));
             solver.update_costs<double>(lo_pert_ptr_thrust, solver.nr_variables(), hi_pert_ptr_thrust, solver.nr_variables());
         }, "Perturb primal costs by memory pointed by lo_pert_ptr, hi_pert_ptr. Where both inputs should point to a memory of size nr_variables().")
 

@@ -57,8 +57,8 @@ namespace LPMP {
 #ifdef WITH_CUDA
             using cuda_parallel_mma_float_type = bdd_cuda_parallel_mma<float>;
             using cuda_parallel_mma_double_type = bdd_cuda_parallel_mma<double>;
-            using cuda_lbfgs_parallel_mma_float_type = lbfgs<bdd_cuda_parallel_mma<float>, thrust::device_vector<float>, float, thrust::device_vector<char>, true>;
-            using cuda_lbfgs_parallel_mma_double_type = lbfgs<bdd_cuda_parallel_mma<double>, thrust::device_vector<double>, double, thrust::device_vector<char>, true>;
+            using cuda_lbfgs_parallel_mma_float_type = lbfgs<bdd_cuda_parallel_mma<float>, mgxthrust::device_vector<float>, float, mgxthrust::device_vector<char>, true>;
+            using cuda_lbfgs_parallel_mma_double_type = lbfgs<bdd_cuda_parallel_mma<double>, mgxthrust::device_vector<double>, double, mgxthrust::device_vector<char>, true>;
 #endif
 
             using solver_type = std::variant<

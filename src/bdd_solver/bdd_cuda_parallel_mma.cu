@@ -19,20 +19,20 @@ namespace LPMP {
     template<typename REAL>
     void bdd_cuda_parallel_mma<REAL>::init()
     {
-        mm_lo_local_ = thrust::device_vector<REAL>(*std::max_element(this->cum_nr_layers_per_hop_dist_.begin(), this->cum_nr_layers_per_hop_dist_.end())); // size of largest layer.
+        mm_lo_local_ = mgxthrust::device_vector<REAL>(*std::max_element(this->cum_nr_layers_per_hop_dist_.begin(), this->cum_nr_layers_per_hop_dist_.end())); // size of largest layer.
 
         // Copy from arc costs because it contains infinity for arcs to bot sink
-        hi_cost_out_ = thrust::device_vector<REAL>(this->hi_cost_);
-        lo_cost_out_ = thrust::device_vector<REAL>(this->lo_cost_);
+        hi_cost_out_ = mgxthrust::device_vector<REAL>(this->hi_cost_);
+        lo_cost_out_ = mgxthrust::device_vector<REAL>(this->lo_cost_);
     }
 
     template<typename REAL>
     struct compute_mm_diff_flush_mm_lo {
         REAL omega;
-        __device__ void operator()(const thrust::tuple<REAL&, REAL&> t) const
+        __device__ void operator()(const mgxthrust::tuple<REAL&, REAL&> t) const
         {
-            REAL& mm_hi = thrust::get<0>(t);
-            REAL& mm_lo = thrust::get<1>(t);
+            REAL& mm_hi = mgxthrust::get<0>(t);
+            REAL& mm_lo = mgxthrust::get<1>(t);
             if (!isfinite(mm_hi) || !isfinite(mm_lo))
                 mm_hi = 0.0; // Set mm_difference to zero to not create NaNs in costs.
             else
@@ -43,11 +43,11 @@ namespace LPMP {
 
     template<typename REAL>
     struct compute_mm_diff_flush_mm_lo_with_omega_vec {
-        __device__ void operator()(const thrust::tuple<REAL&, REAL&, const REAL> t) const
+        __device__ void operator()(const mgxthrust::tuple<REAL&, REAL&, const REAL> t) const
         {
-            REAL& mm_hi = thrust::get<0>(t);
-            REAL& mm_lo = thrust::get<1>(t);
-            const REAL omega = thrust::get<2>(t);
+            REAL& mm_hi = mgxthrust::get<0>(t);
+            REAL& mm_lo = mgxthrust::get<1>(t);
+            const REAL omega = mgxthrust::get<2>(t);
             if (!isfinite(mm_hi) || !isfinite(mm_lo))
                 mm_hi = 0.0; // Set mm_difference to zero to not create NaNs in costs.
             else
@@ -88,7 +88,7 @@ namespace LPMP {
     // This function does not need lo_path_costs and hi_path_costs to compute min-marginals. Writes min-marginal differences in GPU array referenced by mm_diff_ptr at 
     // locations corresponding to hop_index.
     template<typename REAL>
-    void bdd_cuda_parallel_mma<REAL>::min_marginals_from_directional_costs(const int hop_index, const REAL omega_scalar, thrust::device_ptr<REAL> mm_diff_ptr, const thrust::device_ptr<const REAL> omega_vec)
+    void bdd_cuda_parallel_mma<REAL>::min_marginals_from_directional_costs(const int hop_index, const REAL omega_scalar, mgxthrust::device_ptr<REAL> mm_diff_ptr, const mgxthrust::device_ptr<const REAL> omega_vec)
     {
         MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME
         
@@ -102,30 +102,30 @@ namespace LPMP {
         const int cur_num_layers = end_offset_layer - start_offset_layer;
 
         min_marginals_from_directional_costs_cuda<<<blockCount, NUM_THREADS_CUDA>>>(cur_num_bdd_nodes, num_nodes_processed, start_offset_layer,
-                                                thrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
-                                                thrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
-                                                thrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
-                                                thrust::raw_pointer_cast(this->lo_cost_.data()),
-                                                thrust::raw_pointer_cast(this->hi_cost_.data()),
-                                                thrust::raw_pointer_cast(this->cost_from_root_.data()),
-                                                thrust::raw_pointer_cast(this->cost_from_terminal_.data()),
-                                                thrust::raw_pointer_cast(mm_lo_local_.data()),
-                                                thrust::raw_pointer_cast(mm_diff_ptr));
+                                                mgxthrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
+                                                mgxthrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
+                                                mgxthrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
+                                                mgxthrust::raw_pointer_cast(this->lo_cost_.data()),
+                                                mgxthrust::raw_pointer_cast(this->hi_cost_.data()),
+                                                mgxthrust::raw_pointer_cast(this->cost_from_root_.data()),
+                                                mgxthrust::raw_pointer_cast(this->cost_from_terminal_.data()),
+                                                mgxthrust::raw_pointer_cast(mm_lo_local_.data()),
+                                                mgxthrust::raw_pointer_cast(mm_diff_ptr));
 
-        thrust::device_ptr<REAL> mm_lo_start = mm_lo_local_.data();
+        mgxthrust::device_ptr<REAL> mm_lo_start = mm_lo_local_.data();
 
         if (!omega_vec.get()) // Uses omega as a scalar value.
         {
-            auto first = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_ptr + start_offset_layer, mm_lo_start));
-            auto last = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_ptr + end_offset_layer, mm_lo_start + cur_num_layers));
-            thrust::for_each(first, last, compute_mm_diff_flush_mm_lo<REAL>({omega_scalar})); // Convert to min-marginal difference and set mm_lo_local_ to inf.
+            auto first = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_ptr + start_offset_layer, mm_lo_start));
+            auto last = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_ptr + end_offset_layer, mm_lo_start + cur_num_layers));
+            mgxthrust::for_each(first, last, compute_mm_diff_flush_mm_lo<REAL>({omega_scalar})); // Convert to min-marginal difference and set mm_lo_local_ to inf.
         }
         else    // Assumes a value per layer is given which is going to be used to damp min-marginal differences.
         {
             assert(omega_scalar == 1.0);
-            auto first = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_ptr + start_offset_layer, mm_lo_start, omega_vec + start_offset_layer));
-            auto last = thrust::make_zip_iterator(thrust::make_tuple(mm_diff_ptr + end_offset_layer, mm_lo_start + cur_num_layers, omega_vec + end_offset_layer));
-            thrust::for_each(first, last, compute_mm_diff_flush_mm_lo_with_omega_vec<REAL>()); // Convert to min-marginal difference and set mm_lo_local_ to inf.
+            auto first = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_ptr + start_offset_layer, mm_lo_start, omega_vec + start_offset_layer));
+            auto last = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(mm_diff_ptr + end_offset_layer, mm_lo_start + cur_num_layers, omega_vec + end_offset_layer));
+            mgxthrust::for_each(first, last, compute_mm_diff_flush_mm_lo_with_omega_vec<REAL>()); // Convert to min-marginal difference and set mm_lo_local_ to inf.
         }
         #ifndef NDEBUG
             cudaDeviceSynchronize();  // Not necessary, only to compute exact timing of this function.
@@ -144,7 +144,7 @@ namespace LPMP {
     {
         MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME;
         if(this->delta_lo_hi_.size() == 0)
-            this->delta_lo_hi_ = thrust::device_vector<REAL>(this->nr_variables() * 2, 0.0);
+            this->delta_lo_hi_ = mgxthrust::device_vector<REAL>(this->nr_variables() * 2, 0.0);
 
         forward_mm(omega, this->delta_lo_hi_);
         normalize_delta(this->delta_lo_hi_);
@@ -205,7 +205,7 @@ namespace LPMP {
     }
 
     template<typename REAL>
-        void bdd_cuda_parallel_mma<REAL>::forward_mm(const REAL omega, thrust::device_vector<REAL>& delta_lo_hi)
+        void bdd_cuda_parallel_mma<REAL>::forward_mm(const REAL omega, mgxthrust::device_vector<REAL>& delta_lo_hi)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME2("cuda mma forward mma");
             if(!this->backward_state_valid_)
@@ -229,22 +229,22 @@ namespace LPMP {
 
             // 2. Subtract from hi_costs, update costs from root.
             forward_step_with_solve<<<blockCount, NUM_THREADS_CUDA>>>(cur_num_bdd_nodes, num_nodes_processed,
-                                                                thrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
-                                                                thrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
-                                                                thrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
-                                                                thrust::raw_pointer_cast(this->primal_variable_index_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->primal_variable_index_.data()),
                                                                 // in
-                                                                thrust::raw_pointer_cast(delta_lo_hi.data()),
-                                                                thrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
-                                                                thrust::raw_pointer_cast(this->lo_cost_.data()),
-                                                                thrust::raw_pointer_cast(this->hi_cost_.data()),
+                                                                mgxthrust::raw_pointer_cast(delta_lo_hi.data()),
+                                                                mgxthrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->lo_cost_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->hi_cost_.data()),
                                                                 // out
-                                                                thrust::raw_pointer_cast(this->lo_cost_out_.data()),
-                                                                thrust::raw_pointer_cast(this->hi_cost_out_.data()),
-                                                                thrust::raw_pointer_cast(this->cost_from_root_.data()));
+                                                                mgxthrust::raw_pointer_cast(this->lo_cost_out_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->hi_cost_out_.data()),
+                                                                mgxthrust::raw_pointer_cast(this->cost_from_root_.data()));
         }
-        thrust::swap(this->lo_cost_, lo_cost_out_);
-        thrust::swap(this->hi_cost_, hi_cost_out_);
+        mgxthrust::swap(this->lo_cost_, lo_cost_out_);
+        mgxthrust::swap(this->hi_cost_, hi_cost_out_);
 
         compute_delta(this->deffered_mm_diff_.data(), delta_lo_hi.data());
 
@@ -299,7 +299,7 @@ namespace LPMP {
     }
 
     template<typename REAL>
-        void bdd_cuda_parallel_mma<REAL>::backward_mm(const REAL omega, thrust::device_vector<REAL>& delta_lo_hi)
+        void bdd_cuda_parallel_mma<REAL>::backward_mm(const REAL omega, mgxthrust::device_vector<REAL>& delta_lo_hi)
         {
             MEASURE_CUMULATIVE_FUNCTION_EXECUTION_TIME2("cuda mma backward mma");
             assert(this->forward_state_valid_); 
@@ -320,20 +320,20 @@ namespace LPMP {
 
                 // 2. Subtract from hi_costs, update costs from terminal.
                 backward_step_with_solve<<<blockCount, NUM_THREADS_CUDA>>>(cur_num_bdd_nodes, start_offset,
-                        thrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
-                        thrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
-                        thrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
-                        thrust::raw_pointer_cast(this->primal_variable_index_.data()),
-                        thrust::raw_pointer_cast(delta_lo_hi.data()),
-                        thrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
-                        thrust::raw_pointer_cast(this->lo_cost_.data()),
-                        thrust::raw_pointer_cast(this->hi_cost_.data()),
-                        thrust::raw_pointer_cast(lo_cost_out_.data()),
-                        thrust::raw_pointer_cast(hi_cost_out_.data()),
-                        thrust::raw_pointer_cast(this->cost_from_terminal_.data()));
+                        mgxthrust::raw_pointer_cast(this->lo_bdd_node_index_.data()),
+                        mgxthrust::raw_pointer_cast(this->hi_bdd_node_index_.data()),
+                        mgxthrust::raw_pointer_cast(this->bdd_node_to_layer_map_.data()),
+                        mgxthrust::raw_pointer_cast(this->primal_variable_index_.data()),
+                        mgxthrust::raw_pointer_cast(delta_lo_hi.data()),
+                        mgxthrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
+                        mgxthrust::raw_pointer_cast(this->lo_cost_.data()),
+                        mgxthrust::raw_pointer_cast(this->hi_cost_.data()),
+                        mgxthrust::raw_pointer_cast(lo_cost_out_.data()),
+                        mgxthrust::raw_pointer_cast(hi_cost_out_.data()),
+                        mgxthrust::raw_pointer_cast(this->cost_from_terminal_.data()));
             }
-            thrust::swap(this->lo_cost_, lo_cost_out_);
-            thrust::swap(this->hi_cost_, hi_cost_out_);
+            mgxthrust::swap(this->lo_cost_, lo_cost_out_);
+            mgxthrust::swap(this->hi_cost_, hi_cost_out_);
 
             compute_delta(this->deffered_mm_diff_.data(), delta_lo_hi.data());
 
@@ -378,33 +378,33 @@ namespace LPMP {
     // TODO: use device_vector?
     template<typename REAL>
     void bdd_cuda_parallel_mma<REAL>::compute_delta(
-            const thrust::device_ptr<const REAL> mm_to_distribute,
-            thrust::device_ptr<REAL> delta_lo_hi) const
+            const mgxthrust::device_ptr<const REAL> mm_to_distribute,
+            mgxthrust::device_ptr<REAL> delta_lo_hi) const
     {
 
-        thrust::fill(delta_lo_hi, delta_lo_hi + 2 * this->nr_variables(), 0.0);
+        mgxthrust::fill(delta_lo_hi, delta_lo_hi + 2 * this->nr_variables(), 0.0);
 
         compute_delta_atomic<REAL> compute_delta_atomic_func({
-                                            thrust::raw_pointer_cast(this->primal_variable_index_.data()),
-                                            thrust::raw_pointer_cast(mm_to_distribute),
-                                            thrust::raw_pointer_cast(delta_lo_hi),
+                                            mgxthrust::raw_pointer_cast(this->primal_variable_index_.data()),
+                                            mgxthrust::raw_pointer_cast(mm_to_distribute),
+                                            mgxthrust::raw_pointer_cast(delta_lo_hi),
                                             this->nr_variables()});
 
-        thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + this->nr_layers(), compute_delta_atomic_func);
+        mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + this->nr_layers(), compute_delta_atomic_func);
 
-        // auto first_val = thrust::make_zip_iterator(thrust::make_tuple(
-        //     thrust::make_permutation_iterator(thrust::make_transform_iterator(mm_to_distribute, pos_part<REAL>()), this->primal_variable_sorting_order_.begin()),
-        //     thrust::make_permutation_iterator(thrust::make_transform_iterator(mm_to_distribute, abs_neg_part<REAL>()), this->primal_variable_sorting_order_.begin())));
+        // auto first_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(
+        //     mgxthrust::make_permutation_iterator(mgxthrust::make_transform_iterator(mm_to_distribute, pos_part<REAL>()), this->primal_variable_sorting_order_.begin()),
+        //     mgxthrust::make_permutation_iterator(mgxthrust::make_transform_iterator(mm_to_distribute, abs_neg_part<REAL>()), this->primal_variable_sorting_order_.begin())));
 
-        // auto first_out_val = thrust::make_zip_iterator(thrust::make_tuple(delta_hi, delta_lo));
+        // auto first_out_val = mgxthrust::make_zip_iterator(mgxthrust::make_tuple(delta_hi, delta_lo));
 
-        // thrust::equal_to<int> binary_pred;
-        // auto new_end = thrust::reduce_by_key(this->primal_variable_index_sorted_.begin(), this->primal_variable_index_sorted_.end() - this->nr_bdds_, first_val, 
-        //                     thrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum());
-        //assert(thrust::distance(first_out_val, new_end.second) == delta_hi.size());
-        // thrust::reduce_by_key(thrust::make_permutation_iterator(this->primal_variable_index_.begin(), primal_variable_sorting_order_.begin()),
-        //                     thrust::make_permutation_iterator(this->primal_variable_index_.end(), primal_variable_sorting_order_.end()), first_val, 
-        //                     thrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum()); // Uses less memory but slower.
+        // mgxthrust::equal_to<int> binary_pred;
+        // auto new_end = mgxthrust::reduce_by_key(this->primal_variable_index_sorted_.begin(), this->primal_variable_index_sorted_.end() - this->nr_bdds_, first_val, 
+        //                     mgxthrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum());
+        //assert(mgxthrust::distance(first_out_val, new_end.second) == delta_hi.size());
+        // mgxthrust::reduce_by_key(mgxthrust::make_permutation_iterator(this->primal_variable_index_.begin(), primal_variable_sorting_order_.begin()),
+        //                     mgxthrust::make_permutation_iterator(this->primal_variable_index_.end(), primal_variable_sorting_order_.end()), first_val, 
+        //                     mgxthrust::make_discard_iterator(), first_out_val, binary_pred, tuple_sum()); // Uses less memory but slower.
     }
 
     template<typename REAL>
@@ -419,14 +419,14 @@ namespace LPMP {
     };
 
     template<typename REAL>
-    void bdd_cuda_parallel_mma<REAL>::normalize_delta(thrust::device_vector<REAL>& delta_lo_hi) const
+    void bdd_cuda_parallel_mma<REAL>::normalize_delta(mgxthrust::device_vector<REAL>& delta_lo_hi) const
     {
         assert(delta_lo_hi.size() == 2 * this->nr_variables());
         normalize_delta_st<REAL> normalize_delta_func({
-                                    thrust::raw_pointer_cast(this->num_bdds_per_var_.data()),
-                                    thrust::raw_pointer_cast(delta_lo_hi.data())});
+                                    mgxthrust::raw_pointer_cast(this->num_bdds_per_var_.data()),
+                                    mgxthrust::raw_pointer_cast(delta_lo_hi.data())});
 
-        thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + 2 * this->num_bdds_per_var_.size(), normalize_delta_func);
+        mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + 2 * this->num_bdds_per_var_.size(), normalize_delta_func);
     }
 
     template<typename REAL>
@@ -447,30 +447,30 @@ namespace LPMP {
     };
 
     template<typename REAL>
-    thrust::device_vector<REAL> bdd_cuda_parallel_mma<REAL>::net_solver_costs() const
+    mgxthrust::device_vector<REAL> bdd_cuda_parallel_mma<REAL>::net_solver_costs() const
     {
-        thrust::device_vector<REAL> net_cost(this->nr_layers());
+        mgxthrust::device_vector<REAL> net_cost(this->nr_layers());
 
         compute_net_costs_func<REAL> net_costs_func({
-            thrust::raw_pointer_cast(this->primal_variable_index_.data()),
-            thrust::raw_pointer_cast(this->lo_cost_.data()),
-            thrust::raw_pointer_cast(this->hi_cost_.data()),
-            thrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
-            thrust::raw_pointer_cast(net_cost.data())});
+            mgxthrust::raw_pointer_cast(this->primal_variable_index_.data()),
+            mgxthrust::raw_pointer_cast(this->lo_cost_.data()),
+            mgxthrust::raw_pointer_cast(this->hi_cost_.data()),
+            mgxthrust::raw_pointer_cast(this->deffered_mm_diff_.data()),
+            mgxthrust::raw_pointer_cast(net_cost.data())});
 
-        thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + this->nr_layers(), net_costs_func);
+        mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + this->nr_layers(), net_costs_func);
         return net_cost;
     }
 
    template<typename REAL>
-    void bdd_cuda_parallel_mma<REAL>::flush_mm(thrust::device_ptr<REAL> mm_diff_ptr)
+    void bdd_cuda_parallel_mma<REAL>::flush_mm(mgxthrust::device_ptr<REAL> mm_diff_ptr)
     {   // Makes min marginals INF so that they can be populated again by in-place minimization
-        thrust::fill(mm_lo_local_.begin(), mm_lo_local_.end(), CUDART_INF_F_HOST);
-        thrust::fill(mm_diff_ptr, mm_diff_ptr + this->nr_layers(), CUDART_INF_F_HOST);
+        mgxthrust::fill(mm_lo_local_.begin(), mm_lo_local_.end(), CUDART_INF_F_HOST);
+        mgxthrust::fill(mm_diff_ptr, mm_diff_ptr + this->nr_layers(), CUDART_INF_F_HOST);
     }
 
     template class bdd_cuda_parallel_mma<float>;
     template class bdd_cuda_parallel_mma<double>;
-    //template void bdd_cuda_parallel_mma<float>::gradient_step(thrust::detail::normal_iterator<thrust::device_ptr<float const> >, thrust::detail::normal_iterator<thrust::device_ptr<float const> >, double);
-    //template void bdd_cuda_parallel_mma<double>::gradient_step(thrust::detail::normal_iterator<thrust::device_ptr<double const> >, thrust::detail::normal_iterator<thrust::device_ptr<double const> >, double);
+    //template void bdd_cuda_parallel_mma<float>::gradient_step(mgxthrust::detail::normal_iterator<mgxthrust::device_ptr<float const> >, mgxthrust::detail::normal_iterator<mgxthrust::device_ptr<float const> >, double);
+    //template void bdd_cuda_parallel_mma<double>::gradient_step(mgxthrust::detail::normal_iterator<mgxthrust::device_ptr<double const> >, mgxthrust::detail::normal_iterator<mgxthrust::device_ptr<double const> >, double);
 }

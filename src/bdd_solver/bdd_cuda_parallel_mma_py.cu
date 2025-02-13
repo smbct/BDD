@@ -60,14 +60,14 @@ PYBIND11_MODULE(bdd_cuda_parallel_mma_py, m) {
             // Assumes enough space is allocated. To query required space call: solver.nr_layers().
 
             float* mm_diff_ptr = reinterpret_cast<float*>(mm_diff_out_ptr); // Points to memory allocated by Python.
-            thrust::device_ptr<float> mm_diff_ptr_thrust = thrust::device_pointer_cast(mm_diff_ptr);
+            mgxthrust::device_ptr<float> mm_diff_ptr_thrust = mgxthrust::device_pointer_cast(mm_diff_ptr);
 
             const auto mms = solver.min_marginals_cuda(false);
-            const thrust::device_vector<int> primal_index = std::get<0>(mms);
-            const thrust::device_vector<float> mm_0 = std::get<1>(mms);
-            const thrust::device_vector<float> mm_1 = std::get<2>(mms);
+            const mgxthrust::device_vector<int> primal_index = std::get<0>(mms);
+            const mgxthrust::device_vector<float> mm_0 = std::get<1>(mms);
+            const mgxthrust::device_vector<float> mm_1 = std::get<2>(mms);
             // set hi - lo in mm_diff_out_ptr.
-            thrust::transform(mm_1.begin(), mm_1.end(), mm_0.begin(), mm_diff_ptr_thrust, thrust::minus<float>());
+            mgxthrust::transform(mm_1.begin(), mm_1.end(), mm_0.begin(), mm_diff_ptr_thrust, mgxthrust::minus<float>());
         })
     ;
 }

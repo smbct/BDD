@@ -57,7 +57,7 @@ namespace LPMP {
             if constexpr(CUDA_SOLVER)
             {
 #ifdef CUDACC
-                thrust::copy(cur_grad_f.begin(), cur_grad_f.end(), prev_grad_f.begin());
+                mgxthrust::copy(cur_grad_f.begin(), cur_grad_f.end(), prev_grad_f.begin());
 #endif
             }
             else
@@ -72,7 +72,7 @@ namespace LPMP {
             if constexpr(CUDA_SOLVER)
             {
 #ifdef CUDACC
-            thrust::transform(cur_x.begin(), cur_x.end(), prev_x.begin(), cur_s.begin(), _1 - _2);
+            mgxthrust::transform(cur_x.begin(), cur_x.end(), prev_x.begin(), cur_s.begin(), _1 - _2);
 #endif
             }
             else
@@ -87,8 +87,8 @@ namespace LPMP {
             if constexpr (CUDA_SOLVER)
             {
 #ifdef CUDACC
-                thrust::transform(prev_grad_f.begin(), prev_grad_f.end(), cur_grad_f.begin(), cur_y.begin(), _1 - _2);
-                rho_inv = thrust::inner_product(cur_s.begin(), cur_s.end(), cur_y.begin(), (REAL)0.0);
+                mgxthrust::transform(prev_grad_f.begin(), prev_grad_f.end(), cur_grad_f.begin(), cur_y.begin(), _1 - _2);
+                rho_inv = mgxthrust::inner_product(cur_s.begin(), cur_s.end(), cur_y.begin(), (REAL)0.0);
 #endif
             }
             else
@@ -124,7 +124,7 @@ namespace LPMP {
             if constexpr(CUDA_SOLVER)
             {
 #ifdef CUDACC
-                thrust::copy(cur_grad_f.begin(), cur_grad_f.end(), prev_grad_f.begin());
+                mgxthrust::copy(cur_grad_f.begin(), cur_grad_f.end(), prev_grad_f.begin());
 #endif
             }
             else
@@ -234,7 +234,7 @@ namespace LPMP {
         if constexpr(CUDA_SOLVER)
         {
 #ifdef CUDACC
-            thrust::copy(cur_grad_f.begin(), cur_grad_f.end(), direction.begin());
+            mgxthrust::copy(cur_grad_f.begin(), cur_grad_f.end(), direction.begin());
 #endif
         }
         else
@@ -252,7 +252,7 @@ namespace LPMP {
             if constexpr (CUDA_SOLVER)
             {
 #ifdef CUDACC
-                REAL alpha = thrust::inner_product(history[i].s.begin(), history[i].s.end(), direction.begin(), (REAL)0.0) / (history[i].rho_inv);
+                REAL alpha = mgxthrust::inner_product(history[i].s.begin(), history[i].s.end(), direction.begin(), (REAL)0.0) / (history[i].rho_inv);
 #endif
             }
             else
@@ -265,7 +265,7 @@ namespace LPMP {
             if constexpr (CUDA_SOLVER)
             {
 #ifdef CUDACC
-                thrust::transform(history[i].y.begin(), history[i].y.end(), direction.begin(), direction.begin(), _2 - alpha * _1);
+                mgxthrust::transform(history[i].y.begin(), history[i].y.end(), direction.begin(), direction.begin(), _2 - alpha * _1);
 #endif
             }
             else
@@ -281,7 +281,7 @@ namespace LPMP {
         if constexpr (CUDA_SOLVER)
         {
 #ifdef CUDACC
-            last_y_norm = thrust::inner_product(history.back().y.begin(), history.back().y.end(), history.back().y.begin(), (REAL)0.0);
+            last_y_norm = mgxthrust::inner_product(history.back().y.begin(), history.back().y.end(), history.back().y.begin(), (REAL)0.0);
 #endif
         }
         else
@@ -301,8 +301,8 @@ namespace LPMP {
                 if constexpr (CUDA_SOLVER)
                 {
 #ifdef CUDACC
-                    const REAL beta = current_rho * thrust::inner_product(history[i].y.begin(), history[i].y.end(), direction.begin(), (REAL)0.0);
-                    thrust::transform(history[i].s.begin(), history[i].s.end(), direction.begin(), direction.begin(), _2 + (alpha_history[i] - beta) * _1);
+                    const REAL beta = current_rho * mgxthrust::inner_product(history[i].y.begin(), history[i].y.end(), direction.begin(), (REAL)0.0);
+                    mgxthrust::transform(history[i].s.begin(), history[i].s.end(), direction.begin(), direction.begin(), _2 + (alpha_history[i] - beta) * _1);
 #endif
                 }
                 else
@@ -359,7 +359,7 @@ namespace LPMP {
 
 #ifdef WITH_CUDA
     template<class SOLVER, typename VECTOR, typename REAL, typename INT_VECTOR, bool CUDA_SOLVER>
-    void lbfgs<SOLVER, VECTOR, REAL, INT_VECTOR, CUDA_SOLVER>::update_costs(const thrust::device_vector<REAL>& cost_0, const thrust::device_vector<REAL>& cost_1)
+    void lbfgs<SOLVER, VECTOR, REAL, INT_VECTOR, CUDA_SOLVER>::update_costs(const mgxthrust::device_vector<REAL>& cost_0, const mgxthrust::device_vector<REAL>& cost_1)
     {
         flush_lbfgs_states();
         if constexpr (CUDA_SOLVER)
