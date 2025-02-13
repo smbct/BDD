@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_solver/bdd_parallel_mma_base.h"
 #include "bdd_solver/bdd_cuda_parallel_mma.h"
 #include "bdd_solver/bdd_branch_instruction.h"
@@ -68,7 +69,7 @@ void test_problem(const std::string& problem_input, const bool with_additional_g
     // lb and deltas after forward and backward passes
     {
         std::vector<std::array<double,2>> cpu_delta(parallel_mma.nr_variables(), std::array<double,2>{0.0, 0.0});
-        thrust::device_vector<double> cuda_delta(2*parallel_mma.nr_variables(), 0.0);
+        mgxthrust::device_vector<double> cuda_delta(2*parallel_mma.nr_variables(), 0.0);
 
         for(size_t iter=0; iter<10; ++iter)
         {

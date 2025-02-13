@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_solver/bdd_cuda_learned_mma.h"
 #include "ILP/ILP_parser.h"
 #include "bdd_collection/bdd_collection.h"
@@ -237,21 +238,21 @@ void test_problem(const char* instance, const double expected_lb, const double t
         test(diff <= tol, buffer.str());
     }
 
-    const thrust::device_vector<int> primal_var_index = solver.get_primal_variable_index();
-    const thrust::device_vector<int> num_bdds_var = solver.get_num_bdds_per_var();
-    thrust::device_vector<double> dist_weights(primal_var_index.size());
+    const mgxthrust::device_vector<int> primal_var_index = solver.get_primal_variable_index();
+    const mgxthrust::device_vector<int> num_bdds_var = solver.get_num_bdds_per_var();
+    mgxthrust::device_vector<double> dist_weights(primal_var_index.size());
 
-    isotropic_dist_w_func func({thrust::raw_pointer_cast(primal_var_index.data()), 
-                            thrust::raw_pointer_cast(num_bdds_var.data()), 
-                            thrust::raw_pointer_cast(dist_weights.data()),
+    isotropic_dist_w_func func({mgxthrust::raw_pointer_cast(primal_var_index.data()), 
+                            mgxthrust::raw_pointer_cast(num_bdds_var.data()), 
+                            mgxthrust::raw_pointer_cast(dist_weights.data()),
                             solver.nr_variables()});
 
-    thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + dist_weights.size(), func);
+    mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + dist_weights.size(), func);
 
 
-    thrust::device_vector<double> sol_avg(primal_var_index.size());
-    thrust::device_vector<double> lb_first_avg(solver.nr_bdds());
-    thrust::device_vector<double> lb_second_avg(solver.nr_bdds());
+    mgxthrust::device_vector<double> sol_avg(primal_var_index.size());
+    mgxthrust::device_vector<double> lb_first_avg(solver.nr_bdds());
+    mgxthrust::device_vector<double> lb_second_avg(solver.nr_bdds());
 
     solver.iterations(dist_weights.data(), 500, 0.5, 1e-9, sol_avg.data(), lb_first_avg.data(), lb_second_avg.data(), 20, 0.9);
     print_min_max(sol_avg.data(), "sol_avg", sol_avg.size());

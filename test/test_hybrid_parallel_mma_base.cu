@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_solver/bdd_multi_parallel_mma_base.h"
 #include "bdd_solver/bdd_parallel_mma_base.h"
 #include "bdd_solver/bdd_branch_instruction.h"
@@ -97,8 +98,8 @@ void test_problem(const std::string& problem_input)
     // lb and deltas after forward and backward passes
     {
         std::vector<std::array<double,2>> cpu_delta(ilp.nr_variables(), std::array<double,2>{0.0, 0.0});
-        thrust::device_vector<double> cuda_delta(2*ilp.nr_variables(), 0.0);
-        thrust::device_vector<double> hybrid_delta(2*ilp.nr_variables(), 0.0);
+        mgxthrust::device_vector<double> cuda_delta(2*ilp.nr_variables(), 0.0);
+        mgxthrust::device_vector<double> hybrid_delta(2*ilp.nr_variables(), 0.0);
 
         for(size_t iter=0; iter<10; ++iter)
         {

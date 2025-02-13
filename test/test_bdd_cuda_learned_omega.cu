@@ -1,3 +1,4 @@
+#include "fix.h"
 #include "bdd_solver/bdd_cuda_learned_mma.h"
 #include "ILP/ILP_parser.h"
 #include "bdd_collection/bdd_collection.h"
@@ -221,22 +222,22 @@ struct normalize_dist_weights {
 };
 
 template<typename SOLVER>
-void project_dist_weights(SOLVER& solver, thrust::device_vector<double>& dist_weights, const thrust::device_vector<int>& primal_var_index)
+void project_dist_weights(SOLVER& solver, mgxthrust::device_vector<double>& dist_weights, const mgxthrust::device_vector<int>& primal_var_index)
 {
-    thrust::device_vector<double> dist_weights_sum(solver.nr_variables(), 0.0);
+    mgxthrust::device_vector<double> dist_weights_sum(solver.nr_variables(), 0.0);
 
-    sum_dist_weights sum_func({thrust::raw_pointer_cast(primal_var_index.data()), 
-                                thrust::raw_pointer_cast(dist_weights.data()), 
-                                thrust::raw_pointer_cast(dist_weights_sum.data()),
+    sum_dist_weights sum_func({mgxthrust::raw_pointer_cast(primal_var_index.data()), 
+                                mgxthrust::raw_pointer_cast(dist_weights.data()), 
+                                mgxthrust::raw_pointer_cast(dist_weights_sum.data()),
                                 solver.nr_variables()});
 
-    thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + dist_weights.size(), sum_func);
+    mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + dist_weights.size(), sum_func);
 
-    normalize_dist_weights norm_func({thrust::raw_pointer_cast(primal_var_index.data()), 
-                                    thrust::raw_pointer_cast(dist_weights_sum.data()),
-                                    thrust::raw_pointer_cast(dist_weights.data()), 
+    normalize_dist_weights norm_func({mgxthrust::raw_pointer_cast(primal_var_index.data()), 
+                                    mgxthrust::raw_pointer_cast(dist_weights_sum.data()),
+                                    mgxthrust::raw_pointer_cast(dist_weights.data()), 
                                     solver.nr_variables()});
-    thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + dist_weights.size(), norm_func);
+    mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + dist_weights.size(), norm_func);
 }
 
 struct loss_func {
@@ -299,7 +300,7 @@ struct grad_step_min_marginals {
     }
 };
 
-thrust::device_vector<double> compute_expected_mm_diff(const char* instance)
+mgxthrust::device_vector<double> compute_expected_mm_diff(const char* instance)
 {
     ILP_input ilp = ILP_parser::parse_string(instance);
     bdd_preprocessor bdd_pre(ilp);
@@ -312,17 +313,17 @@ thrust::device_vector<double> compute_expected_mm_diff(const char* instance)
     for(size_t iter=0; iter<200; ++iter)
         solver.iteration();
 
-    thrust::device_vector<double> expected_mm_diff(solver.nr_layers());
+    mgxthrust::device_vector<double> expected_mm_diff(solver.nr_layers());
     const auto mms = solver.min_marginals_cuda(false);
     const auto& mms_0 = std::get<1>(mms);
     const auto& mms_1 = std::get<2>(mms);
-    thrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), expected_mm_diff.begin(), thrust::minus<double>());
+    mgxthrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), expected_mm_diff.begin(), mgxthrust::minus<double>());
     return expected_mm_diff;
 }
 
 void test_problem(const char* instance, const double expected_lb, double omega = 0.1, const double tol = 1e-12)
 {
-    const thrust::device_vector<double> expected_mm_diff = compute_expected_mm_diff(instance);
+    const mgxthrust::device_vector<double> expected_mm_diff = compute_expected_mm_diff(instance);
     ILP_input ilp = ILP_parser::parse_string(instance);
     bdd_preprocessor bdd_pre(ilp);
     bdd_collection bdd_col = bdd_pre.get_bdd_collection();
@@ -331,13 +332,13 @@ void test_problem(const char* instance, const double expected_lb, double omega =
     for(size_t i=0; i<solver.nr_variables(); ++i)
         solver.set_cost(ilp.objective()[i], i);
 
-    thrust::device_vector<double> dist_weights(solver.nr_layers(), 1.0);
-    const thrust::device_vector<int> primal_var_index = solver.get_primal_variable_index();
+    mgxthrust::device_vector<double> dist_weights(solver.nr_layers(), 1.0);
+    const mgxthrust::device_vector<int> primal_var_index = solver.get_primal_variable_index();
 
-    thrust::device_vector<double> final_mm_diff(solver.nr_layers());
-    thrust::device_vector<double> loss_grad_mm(solver.nr_layers());
-    thrust::device_vector<double> grad_lo_costs(solver.nr_layers());
-    thrust::device_vector<double> grad_hi_costs(solver.nr_layers());
+    mgxthrust::device_vector<double> final_mm_diff(solver.nr_layers());
+    mgxthrust::device_vector<double> loss_grad_mm(solver.nr_layers());
+    mgxthrust::device_vector<double> grad_lo_costs(solver.nr_layers());
+    mgxthrust::device_vector<double> grad_hi_costs(solver.nr_layers());
 
     project_dist_weights(solver, dist_weights, primal_var_index);
     auto initial_costs = solver.get_solver_costs();
@@ -357,35 +358,35 @@ void test_problem(const char* instance, const double expected_lb, double omega =
         const auto mms = solver.min_marginals_cuda(false);
         const auto& mms_0 = std::get<1>(mms);
         const auto& mms_1 = std::get<2>(mms);
-        thrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), final_mm_diff.begin(), thrust::minus<double>());
-        thrust::device_vector<double> loss(final_mm_diff.size());
-        loss_func compute_loss({thrust::raw_pointer_cast(solver.get_primal_variable_index().data()),
-                                thrust::raw_pointer_cast(final_mm_diff.data()),
-                                thrust::raw_pointer_cast(expected_mm_diff.data()),
-                                thrust::raw_pointer_cast(loss.data()),
+        mgxthrust::transform(mms_1.begin(), mms_1.end(), mms_0.begin(), final_mm_diff.begin(), mgxthrust::minus<double>());
+        mgxthrust::device_vector<double> loss(final_mm_diff.size());
+        loss_func compute_loss({mgxthrust::raw_pointer_cast(solver.get_primal_variable_index().data()),
+                                mgxthrust::raw_pointer_cast(final_mm_diff.data()),
+                                mgxthrust::raw_pointer_cast(expected_mm_diff.data()),
+                                mgxthrust::raw_pointer_cast(loss.data()),
                                 solver.nr_variables()});
 
-        thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + solver.nr_layers(), compute_loss);
-        const double loss_val = thrust::reduce(loss.begin(), loss.end());
+        mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + solver.nr_layers(), compute_loss);
+        const double loss_val = mgxthrust::reduce(loss.begin(), loss.end());
         if (learning_itr > 0)
             avg_loss_improvement_per_itr += (prev_loss - loss_val);
         prev_loss = loss_val;
         std::cout<<"Grad itr: "<<learning_itr<<", Omega: "<<omega<<", Loss: "<<loss_val<<", LB: "<<solver.lower_bound()<<", Max. possible LB:  "<<expected_lb<<"\n";
 
         //Backward pass:
-        loss_gradient_func compute_loss_grad({thrust::raw_pointer_cast(solver.get_primal_variable_index().data()),
-                                            thrust::raw_pointer_cast(final_mm_diff.data()),
-                                            thrust::raw_pointer_cast(expected_mm_diff.data()),
-                                            thrust::raw_pointer_cast(loss_grad_mm.data()),
+        loss_gradient_func compute_loss_grad({mgxthrust::raw_pointer_cast(solver.get_primal_variable_index().data()),
+                                            mgxthrust::raw_pointer_cast(final_mm_diff.data()),
+                                            mgxthrust::raw_pointer_cast(expected_mm_diff.data()),
+                                            mgxthrust::raw_pointer_cast(loss_grad_mm.data()),
                                             solver.nr_variables()});
 
-        thrust::for_each(thrust::make_counting_iterator<int>(0), thrust::make_counting_iterator<int>(0) + solver.nr_layers(), compute_loss_grad);
+        mgxthrust::for_each(mgxthrust::make_counting_iterator<int>(0), mgxthrust::make_counting_iterator<int>(0) + solver.nr_layers(), compute_loss_grad);
         solver.grad_mm_diff_all_hops(loss_grad_mm.data(), grad_lo_costs.data(), grad_hi_costs.data());
 
-        thrust::device_vector<double> grad_dist_weights(solver.nr_layers(), 0.0);
-        thrust::device_vector<double> grad_def_mm(solver.nr_layers(), 0.0);
-        thrust::device_vector<double> deferred_min_marginals(solver.nr_layers(), 0.0);
-        thrust::device_vector<double> grad_omega(1, 0.0);
+        mgxthrust::device_vector<double> grad_dist_weights(solver.nr_layers(), 0.0);
+        mgxthrust::device_vector<double> grad_def_mm(solver.nr_layers(), 0.0);
+        mgxthrust::device_vector<double> deferred_min_marginals(solver.nr_layers(), 0.0);
+        mgxthrust::device_vector<double> grad_omega(1, 0.0);
 
         solver.set_solver_costs(costs_before_dist);
         solver.grad_distribute_delta(grad_lo_costs.data(), grad_hi_costs.data(), grad_def_mm.data());
