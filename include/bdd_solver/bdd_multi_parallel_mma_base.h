@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fix.h"
 #include "bdd_collection/bdd_collection.h"
 #include "bdd_solver/bdd_branch_instruction.h"
 #include "bdd_solver/bdd_cuda_parallel_mma.h"
@@ -7,7 +8,6 @@
 #include "bdd_collection/bdd_collection.h"
 #include "two_dimensional_variable_array.hxx"
 #include <limits>
-#include "fix.h"
 #include <thrust/host_vector.h>
 #include <thrust/device_vector.h>
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fix.h"
 #include "bdd_solver/bdd_cuda_base.h"
 
 namespace LPMP {

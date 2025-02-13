@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fix.h"
 #include "bdd_cuda_parallel_mma.h"
 #include <vector>
 

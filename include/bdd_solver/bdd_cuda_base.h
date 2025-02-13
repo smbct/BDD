@@ -1,11 +1,11 @@
 #pragma once
 
+#include "fix.h"
 #include <array>
 #include <vector>
 #include "bdd_collection/bdd_collection.h"
 #include "two_dimensional_variable_array.hxx"
 #include <cuda_runtime.h>
-#include "fix.h"
 #include <thrust/device_vector.h>
 
 // For serialization
