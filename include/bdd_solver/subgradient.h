@@ -1,10 +1,10 @@
 #pragma once
 
+#include "fix.h"
 #include "bdd_collection/bdd_collection.h"
 #include "bdd_logging.h"
 #include <limits>
 #ifdef WITH_CUDA
-#include "fix.h"
 #include <thrust/device_vector.h>
 #endif
 

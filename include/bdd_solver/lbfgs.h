@@ -1,12 +1,12 @@
 #pragma once
 
+#include "fix.h"
 #include <vector>
 #include "bdd_collection/bdd_collection.h"
 #include "time_measure_util.h"
 #include "bdd_logging.h"
 #include <deque>
 #ifdef WITH_CUDA
-#include "fix.h"
 #include <thrust/for_each.h>
 #include <thrust/inner_product.h>
 #include <thrust/host_vector.h>

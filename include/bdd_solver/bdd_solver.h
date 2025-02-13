@@ -1,5 +1,6 @@
 #pragma once
 
+#include "fix.h"
 #include "ILP/ILP_input.h"
 // bdd mma
 #include "bdd_mma_base.h"
