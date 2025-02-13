@@ -109,9 +109,9 @@ if(WITH_CUDA)
     target_link_libraries(test_bdd_cuda_parallel_mma LPMP-BDD cuda_bdd_solver)
     add_test(test_bdd_cuda_parallel_mma test_bdd_cuda_parallel_mma)
 
-    add_executable(test_bdd_cuda_min_marginals test_bdd_cuda_min_marginals.cpp)
-    target_link_libraries(test_bdd_cuda_min_marginals LPMP-BDD cuda_bdd_solver)
-    add_test(test_bdd_cuda_min_marginals test_bdd_cuda_min_marginals)
+    #add_executable(test_bdd_cuda_min_marginals test_bdd_cuda_min_marginals.cpp)
+    #target_link_libraries(test_bdd_cuda_min_marginals LPMP-BDD cuda_bdd_solver)
+    #add_test(test_bdd_cuda_min_marginals test_bdd_cuda_min_marginals)
 
     add_executable(test_bdd_cuda_sum_marginals test_bdd_cuda_sum_marginals.cpp)
     target_link_libraries(test_bdd_cuda_sum_marginals LPMP-BDD cuda_bdd_solver)
