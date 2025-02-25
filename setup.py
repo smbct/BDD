@@ -97,6 +97,8 @@ class CMakeBuild(build_ext):
         if _cuda_flag == "ON":
             cmake_args.append('-DWITH_CUDA=ON')
 
+            cmake_args.append('-DCMAKE_PREFIX_PATH=/usr/local/cuda')
+            cmake_args.append('-DCMAKE_CUDA_ARCHITECTURES=native')
         # if 'CUDA_PATH' in os.environ:
         #     cuda_path = os.environ['CUDA_HOME']
         #     print(f'Using CUDA from {cuda_path}')
