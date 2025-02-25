@@ -137,7 +137,7 @@ _py_modules = []
 _cuda_flag = os.environ.get("WITH_CUDA", "ON")
 if _cuda_flag == "ON":
     _cmake_modules.append(CMakeExtension(name='bdd_cuda_learned_mma_py'))
-    _py_modules.extend(['bdd_cuda_torch', 'bdd_torch_base', 'bdd_torch_learned_mma'])
+    _py_modules.extend(['bdd_cuda_torch.bdd_cuda_torch', 'bdd_cuda_torch.bdd_torch_base', 'bdd_cuda_torch.bdd_torch_learned_mma'])
 
 setup(
     name='BDD',
