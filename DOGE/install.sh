@@ -17,7 +17,7 @@ pip install tensorboard
 # For config files:
 cd external/yacs
 python setup.py install
-cd ..
+cd ../..
 
 # Parallel deferred min-marginal averaging algorithm:
 cd ..
